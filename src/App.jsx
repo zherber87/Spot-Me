@@ -43,13 +43,43 @@ import { DiscoverScreen } from './components/DiscoverScreen';
 import { MatchesScreen } from './components/MatchesScreen';
 import { ChatScreen } from './components/ChatScreen';
 
-const DAILY_SWIPE_LIMIT = 5;
+// -------------------- CONSTANTS --------------------
+const DAILY_SWIPE_LIMIT = 50;
+const SUPER_SWIPE_DEFAULT = 2;
+
+// simple demo profiles so Discover never looks empty while testing alone
+const DEMO_PROFILES = [
+  {
+    id: 'demo-1',
+    name: 'Sarah',
+    age: 27,
+    gym: 'Equinox',
+    guestPass: true,
+    favoriteWorkouts: ['Running', 'HIIT'],
+    tags: ['Running', 'HIIT'],
+    bio: 'Training for my first half marathon. Love early morning sessions.',
+    emoji: '🏃‍♀️',
+    photoURL: null,
+  },
+  {
+    id: 'demo-2',
+    name: 'Coach Mike',
+    age: 32,
+    gym: 'Gold’s Gym',
+    guestPass: false,
+    favoriteWorkouts: ['Lifting', 'Powerlifting'],
+    tags: ['Lifting', 'Powerlifting'],
+    bio: 'Personal trainer focused on strength and form. Looking for serious partners.',
+    emoji: '💪',
+    photoURL: null,
+  },
+];
 
 export default function App() {
   const [user, setUser] = useState(null);          // Firebase Auth user
   const [userData, setUserData] = useState(null);  // Firestore user document
   const [loading, setLoading] = useState(true);
-  const [authLoading, setAuthLoading] = useState(false); // button spinner
+  const [authLoading, setAuthLoading] = useState(false); // auth button spinner
   const [activeTab, setActiveTab] = useState('discover');
   const [profiles, setProfiles] = useState([]);
   const [matches, setMatches] = useState([]);
@@ -57,7 +87,7 @@ export default function App() {
   const [showPremium, setShowPremium] = useState(false);
   const [showCompleteProfile, setShowCompleteProfile] = useState(false);
 
-  // AUTH LISTENER
+  // -------------------- AUTH LISTENER --------------------
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log('Auth state changed:', currentUser);
@@ -74,6 +104,7 @@ export default function App() {
             // If somehow they have auth but no profile, treat as minimal user
             setUserData({
               swipesLeft: DAILY_SWIPE_LIMIT,
+              superSwipesLeft: SUPER_SWIPE_DEFAULT,
               isPremium: false,
             });
           }
@@ -91,7 +122,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // SHOW "FINISH PROFILE" POPUP FOR INCOMPLETE USERS
+  // -------------------- FINISH PROFILE POPUP --------------------
   useEffect(() => {
     if (user && userData) {
       const incomplete =
@@ -106,24 +137,34 @@ export default function App() {
     }
   }, [user, userData]);
 
-  // FETCH PROFILES
+  // -------------------- FETCH PROFILES --------------------
   useEffect(() => {
     if (!user) return;
 
     const fetchProfiles = async () => {
-      const q = query(collection(db, 'users'), where('onboarded', '==', true));
-      const snapshot = await getDocs(q);
-      const users = snapshot.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .filter((u) => u.id !== user.uid);
+      try {
+        const q = query(collection(db, 'users'), where('onboarded', '==', true));
+        const snapshot = await getDocs(q);
+        const users = snapshot.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((u) => u.id !== user.uid);
 
-      setProfiles(users);
+        if (users.length === 0) {
+          // you’re probably the only real user – show demo profiles so UI isn’t empty
+          setProfiles(DEMO_PROFILES);
+        } else {
+          setProfiles(users);
+        }
+      } catch (err) {
+        console.error('Error fetching profiles:', err);
+        setProfiles(DEMO_PROFILES); // fallback so Discover never looks dead
+      }
     };
 
     fetchProfiles();
   }, [user]);
 
-  // FETCH MATCHES (realtime)
+  // -------------------- FETCH MATCHES (REALTIME) --------------------
   useEffect(() => {
     if (!user) return;
 
@@ -145,7 +186,7 @@ export default function App() {
     return () => unsub();
   }, [user]);
 
-  // AUTH ACTIONS
+  // -------------------- AUTH ACTIONS --------------------
   const handleAuth = async (isSignup, email, password, profileData) => {
     try {
       setAuthLoading(true);
@@ -178,7 +219,8 @@ export default function App() {
         bio: profileData.bio || '',
         photoURL: photoURL,
         onboarded: true, // so they show in Discover
-        swipesLeft: DAILY_SWIPE_LIMIT,
+        swipesLeft: DAILY_SWIPE_LIMIT,           // 50 swipes
+        superSwipesLeft: SUPER_SWIPE_DEFAULT,    // 2 super swipes
         isPremium: false,
         createdAt: serverTimestamp(),
       };
@@ -193,6 +235,7 @@ export default function App() {
     }
   };
 
+  // -------------------- SWIPE LOGIC --------------------
   const handleSwipe = async (direction, targetProfile) => {
     if (!user || !userData || !targetProfile) return;
     if (direction === 'left') return;
@@ -246,14 +289,16 @@ export default function App() {
     }
   };
 
+  // -------------------- PAYWALL / UPGRADE --------------------
   const handleUpgrade = async () => {
     if (!user) return;
     await updateDoc(doc(db, 'users', user.uid), {
       isPremium: true,
-      swipesLeft: 99999,
+      swipesLeft: 99999,            // effectively unlimited
+      superSwipesLeft: 20,          // more super swipes as paid perk
     });
     setUserData((prev) =>
-      prev ? { ...prev, isPremium: true, swipesLeft: 99999 } : prev
+      prev ? { ...prev, isPremium: true, swipesLeft: 99999, superSwipesLeft: 20 } : prev
     );
     setShowPremium(false);
     alert('Upgraded to Gold!');
@@ -263,8 +308,7 @@ export default function App() {
     await signOut(auth);
   };
 
-  // RENDER STATES
-
+  // -------------------- RENDER STATES --------------------
   if (loading) {
     return (
       <IonApp>
@@ -295,12 +339,13 @@ export default function App() {
     );
   }
 
-  // MAIN APP WITH TABS
+  // -------------------- MAIN APP WITH TABS --------------------
   return (
     <IonApp>
       <IonPage>
-        <IonContent className="flex items-center justify-center bg-gray-200 font-sans text-gray-900">
-          <div className="w-full max-w-md h-[100dvh] bg-white sm:h-[850px] sm:rounded-3xl sm:border-8 sm:border-gray-800 sm:shadow-2xl overflow-hidden flex flex-col relative">
+        {/* 🔧 IMPORTANT: remove flex-center here so header isn’t pushed off-screen on iPhone */}
+        <IonContent className="bg-gray-200 font-sans text-gray-900">
+          <div className="w-full max-w-md h-full min-h-[100dvh] bg-white sm:h-[850px] sm:rounded-3xl sm:border-8 sm:border-gray-800 sm:shadow-2xl overflow-hidden flex flex-col relative mx-auto">
             {showPremium && (
               <PremiumModal
                 onClose={() => setShowPremium(false)}
@@ -336,6 +381,7 @@ export default function App() {
               </div>
             )}
 
+            {/* HEADER */}
             {!selectedMatch && (
               <div className="h-16 px-6 flex items-center justify-between bg-white z-20 shadow-sm">
                 <div className="flex items-center gap-2">
@@ -346,14 +392,21 @@ export default function App() {
                     Spot<span className="text-rose-500">Me</span>
                   </h1>
                 </div>
-                <div className="text-xs font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full">
-                  {userData?.isPremium
-                    ? 'GOLD'
-                    : `${userData?.swipesLeft ?? 0} Swipes`}
+                <div className="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full leading-tight text-right">
+                  {userData?.isPremium ? (
+                    'GOLD'
+                  ) : (
+                    <>
+                      {userData?.swipesLeft ?? 0} swipes
+                      <br />
+                      ⚡ {userData?.superSwipesLeft ?? 0} super
+                    </>
+                  )}
                 </div>
               </div>
             )}
 
+            {/* MAIN CONTENT */}
             <div className="flex-1 overflow-hidden relative bg-gray-50 w-full">
               {selectedMatch ? (
                 <ChatScreen
@@ -417,6 +470,7 @@ export default function App() {
               )}
             </div>
 
+            {/* TABS */}
             {!selectedMatch && (
               <IonFooter className="ion-no-border">
                 <IonTabBar>
