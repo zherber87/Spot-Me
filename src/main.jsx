@@ -15,11 +15,10 @@ import "@ionic/react/css/text-transformation.css";
 import "@ionic/react/css/flex-utils.css";
 import "@ionic/react/css/display.css";
 
-import "./index.css";
+import "./index.css"; // optional, but fine if you have it
 
 setupIonicReact();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  // 🚫 remove StrictMode – helps with Firebase + perf in dev
   <App />
 );
