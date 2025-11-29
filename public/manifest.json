@@ -1,0 +1,9 @@
+{
+  "name": "SpotMe",
+  "short_name": "SpotMe",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f43f5e",
+  "icons": []
+}
