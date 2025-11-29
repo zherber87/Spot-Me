@@ -477,20 +477,20 @@ export default function SpotMeApp() {
 
   // ABSTRACTION LAYER FOR BACKEND
   const backend = USE_REAL_FIREBASE ? {
-    // auth: auth, 
-    // db: db,
-    // onAuthStateChanged: onAuthStateChanged,
-    // createUser: createUserWithEmailAndPassword,
-    // signIn: signInWithEmailAndPassword,
-    // signOut: signOut,
-    // doc: doc,
-    // collection: collection,
-    // setDoc: setDoc,
-    // updateDoc: updateDoc,
-    // getDoc: getDoc,
-    // addDoc: addDoc,
-    // increment: increment,
-    // serverTimestamp: serverTimestamp
+     auth: auth, 
+     db: db,
+     onAuthStateChanged: onAuthStateChanged,
+     createUser: createUserWithEmailAndPassword,
+     signIn: signInWithEmailAndPassword,
+     signOut: signOut,
+     doc: doc,
+     collection: collection,
+     setDoc: setDoc,
+     updateDoc: updateDoc,
+     getDoc: getDoc,
+    /addDoc: addDoc,
+     increment: increment,
+     serverTimestamp: serverTimestamp
   } : {
     auth: mockAuth,
     db: mockDb,
