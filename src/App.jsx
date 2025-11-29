@@ -14,27 +14,18 @@ import {
   signOut,
 } from 'firebase/auth';
 import {
-  collection,
   doc,
   setDoc,
   getDoc,
-  getDocs,
-  query,
-  where,
   updateDoc,
   increment,
-  addDoc,
-  onSnapshot,
   serverTimestamp,
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import {
   Dumbbell,
-  Star,
   MessageCircle,
   User as UserIcon,
-  Heart,
   SlidersHorizontal,
 } from 'lucide-react';
 
@@ -48,7 +39,7 @@ import { ChatScreen } from './components/ChatScreen';
 const DAILY_SWIPE_LIMIT = 50;
 const SUPER_SWIPE_DEFAULT = 2;
 
-// demo profiles...
+// Demo Data
 const DEMO_PROFILES = [
   {
     id: 'demo-1',
@@ -103,8 +94,8 @@ function FilterSheet({ open, onClose, current, onApply, isPremium }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-40">
-      <div className="w-full max-w-md bg-white rounded-t-3xl p-5 pb-6 shadow-2xl">
+    <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-50">
+      <div className="w-full max-w-md bg-white rounded-t-3xl p-5 pb-8 shadow-2xl animate-slide-up">
         <h3 className="text-xl font-bold mb-4">Filters</h3>
         
         <div className="mb-4">
@@ -159,6 +150,12 @@ function FilterSheet({ open, onClose, current, onApply, isPremium }) {
         >
             Apply Filters
         </button>
+        <button 
+            onClick={onClose}
+            className="w-full py-3 mt-2 text-gray-500 font-semibold"
+        >
+            Cancel
+        </button>
       </div>
     </div>
   );
@@ -173,7 +170,7 @@ function LikesScreen({ likes }) {
         <div className="text-center text-gray-500 mt-10">No likes yet.</div>
       ) : (
         <div className="grid grid-cols-2 gap-4">
-           {/* Add map logic here if needed */}
+           {/* Add map logic here */}
         </div>
       )}
     </div>
@@ -192,7 +189,6 @@ export default function App() {
   const [likes, setLikes] = useState([]);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [showPremium, setShowPremium] = useState(false);
-  const [showCompleteProfile, setShowCompleteProfile] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [filterOptions, setFilterOptions] = useState({
     intent: 'any',
@@ -200,20 +196,16 @@ export default function App() {
     location: '',
   });
 
-  // -------------------- RESTORED LOGIC --------------------
-  
   // 1. Auth Observer
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Fetch user data from Firestore
         const docRef = doc(db, 'users', currentUser.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setUserData(docSnap.data());
         }
-        // Load demo profiles for swipe deck
         setProfiles(DEMO_PROFILES);
       } else {
         setUserData(null);
@@ -223,7 +215,7 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // 2. Handle Auth (Login/Signup)
+  // 2. Handle Auth
   const handleAuth = async (isSignup, email, password, profileData) => {
     setAuthLoading(true);
     try {
@@ -231,7 +223,6 @@ export default function App() {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
         
-        // Initial user document
         const newUserData = {
             uid,
             email,
@@ -255,13 +246,13 @@ export default function App() {
     }
   };
 
-  // 3. Handle Logout
+  // 3. Logout
   const handleLogout = async () => {
     await signOut(auth);
     setActiveTab('discover');
   };
 
-  // 4. Handle Upgrade
+  // 4. Upgrade
   const handleUpgrade = async () => {
     if (!user) return;
     try {
@@ -277,21 +268,15 @@ export default function App() {
     }
   };
 
-  // 5. Handle Swipe
+  // 5. Swipe
   const handleSwipe = async (direction, profile) => {
     if (!user) return;
-    
-    // Remove card from UI immediately
     setProfiles((prev) => prev.filter((p) => p.id !== profile.id));
-
     if (direction === 'right') {
-        // Record the like in Firestore (simplified)
-        // Check for match logic would go here
         console.log("Liked:", profile.name);
     }
   };
 
-  // -------------------- RENDER STATES --------------------
   if (loading) {
     return (
       <IonApp>
@@ -320,12 +305,14 @@ export default function App() {
     );
   }
 
-  // -------------------- MAIN APP WITH PHONE SHELL --------------------
   return (
     <IonApp>
       <IonPage>
         <IonContent className="bg-gray-200 font-sans text-gray-900 flex justify-center">
-          <div className="w-full max-w-md h-screen sm:h-[850px] sm:my-6 bg-white sm:rounded-3xl sm:border-8 sm:border-gray-800 sm:shadow-2xl overflow-hidden flex flex-col relative">
+          {/* FIX: changed h-screen to h-[100dvh] 
+            'dvh' stands for Dynamic Viewport Height - it accounts for the iPhone URL bar 
+          */}
+          <div className="w-full max-w-md h-[100dvh] sm:h-[850px] sm:my-6 bg-white sm:rounded-3xl sm:border-8 sm:border-gray-800 sm:shadow-2xl overflow-hidden flex flex-col relative">
             
             {showPremium && (
               <PremiumModal
@@ -334,27 +321,31 @@ export default function App() {
               />
             )}
 
+            {/* --- HEADER --- */}
+            {/* Added shrink-0 so it never collapses */}
             {!selectedMatch && (
-              <div className="h-16 px-5 flex items-center justify-between bg-white z-20 shadow-sm">
+              <div className="h-16 shrink-0 px-5 flex items-center justify-between bg-white z-20 shadow-sm border-b border-gray-100">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-rose-500 rounded-full flex items-center justify-center text-white font-bold">
-                        Fit
+                    {/* ICON RESTORED HERE */}
+                    <div className="w-8 h-8 bg-rose-500 rounded-full flex items-center justify-center text-white">
+                        <Dumbbell size={18} />
                     </div>
-                    <span className="font-bold text-xl tracking-tight">GymRat</span>
+                    {/* NAME RESTORED TO SpotMe */}
+                    <span className="font-bold text-xl tracking-tight text-rose-500">SpotMe</span>
                 </div>
                 <div className="flex gap-4">
                     <button onClick={() => setShowFilter(true)}>
                         <SlidersHorizontal size={22} className="text-gray-600" />
                     </button>
                     <button onClick={handleLogout}>
-                         {/* Simple logout trigger */}
                         <UserIcon size={22} className="text-gray-600" />
                     </button>
                 </div>
               </div>
             )}
 
-            {/* MAIN CONTENT */}
+            {/* --- SCROLLABLE CONTENT AREA --- */}
+            {/* flex-1 ensures this takes up all remaining space between header and footer */}
             <div className="flex-1 overflow-hidden relative bg-gray-50 w-full">
               {selectedMatch ? (
                 <ChatScreen
@@ -380,21 +371,25 @@ export default function App() {
               ) : (
                 <div className="h-full overflow-y-auto p-8 flex flex-col items-center">
                    <h2 className="text-2xl font-bold mb-4">{userData?.name || 'User'}</h2>
-                   <button onClick={handleLogout} className="text-red-500 font-bold">Log Out</button>
+                   <div className="w-24 h-24 bg-gray-200 rounded-full mb-4 flex items-center justify-center text-3xl">
+                     {userData?.emoji || '👤'}
+                   </div>
+                   <button onClick={handleLogout} className="text-red-500 font-bold mt-4">Log Out</button>
                 </div>
               )}
             </div>
 
-            {/* BOTTOM NAV */}
+            {/* --- BOTTOM NAVBAR --- */}
+            {/* Added shrink-0 so it sticks to bottom and doesn't squish */}
             {!selectedMatch && (
-              <div className="h-16 border-t border-gray-200 bg-white flex items-center justify-around">
+              <div className="h-16 shrink-0 border-t border-gray-200 bg-white flex items-center justify-around pb-safe">
                 <button
                   onClick={() => setActiveTab('discover')}
                   className={`flex flex-col items-center gap-0.5 text-[10px] ${
                     activeTab === 'discover' ? 'text-rose-500' : 'text-gray-400'
                   }`}
                 >
-                  <Dumbbell size={20} />
+                  <Dumbbell size={24} />
                   <span className="font-semibold">Discover</span>
                 </button>
                 <button
@@ -403,7 +398,7 @@ export default function App() {
                     activeTab === 'matches' ? 'text-rose-500' : 'text-gray-400'
                   }`}
                 >
-                  <MessageCircle size={20} />
+                  <MessageCircle size={24} />
                   <span className="font-semibold">Matches</span>
                 </button>
                 <button
@@ -412,7 +407,7 @@ export default function App() {
                     activeTab === 'profile' ? 'text-rose-500' : 'text-gray-400'
                   }`}
                 >
-                  <UserIcon size={20} />
+                  <UserIcon size={24} />
                   <span className="font-semibold">Profile</span>
                 </button>
               </div>
