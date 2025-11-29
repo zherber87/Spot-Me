@@ -9,6 +9,7 @@ import {
   IonTabButton,
   IonIcon,
   IonLabel,
+  IonHeader,
 } from '@ionic/react';
 import { fitnessOutline, chatbubblesOutline, personOutline } from 'ionicons/icons';
 
@@ -306,6 +307,7 @@ export default function App() {
     );
   }
 
+  // AUTH SCREENS
   if (!user) {
     return (
       <IonApp>
@@ -328,10 +330,37 @@ export default function App() {
   return (
     <IonApp>
       <IonPage>
-        {/* no flex-center here – we want full height layout */}
-        <IonContent fullscreen className="bg-gray-200 font-sans text-gray-900">
-          {/* outer flex just centers horizontally; on desktop also vertically via sm:items-center */}
-          <div className="h-full flex justify-center sm:items-center">
+
+        {/* FIXED HEADER (Ionic manages top position) */}
+        {!selectedMatch && (
+          <IonHeader className="ion-no-border">
+            <div className="h-16 px-6 flex items-center justify-between bg-white shadow-sm">
+              <div className="flex items-center gap-2">
+                <div className="bg-rose-500 p-1.5 rounded-lg">
+                  <Dumbbell className="text-white" size={20} />
+                </div>
+                <h1 className="text-2xl font-black italic text-gray-800">
+                  Spot<span className="text-rose-500">Me</span>
+                </h1>
+              </div>
+              <div className="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full leading-tight text-right">
+                {userData?.isPremium ? (
+                  'GOLD'
+                ) : (
+                  <>
+                    {userData?.swipesLeft ?? 0} swipes
+                    <br />
+                    ⚡ {userData?.superSwipesLeft ?? 0} super
+                  </>
+                )}
+              </div>
+            </div>
+          </IonHeader>
+        )}
+
+        {/* MAIN CONTENT – SCROLLS BETWEEN HEADER & FOOTER */}
+        <IonContent className="bg-gray-200 font-sans text-gray-900">
+          <div className="h-full flex justify-center">
             <div
               className="
                 w-full max-w-md h-full
@@ -374,32 +403,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* HEADER (fixed at top of shell) */}
-              {!selectedMatch && (
-                <div className="h-16 px-6 flex items-center justify-between bg-white z-20 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-rose-500 p-1.5 rounded-lg">
-                      <Dumbbell className="text-white" size={20} />
-                    </div>
-                    <h1 className="text-2xl font-black italic text-gray-800">
-                      Spot<span className="text-rose-500">Me</span>
-                    </h1>
-                  </div>
-                  <div className="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full leading-tight text-right">
-                    {userData?.isPremium ? (
-                      'GOLD'
-                    ) : (
-                      <>
-                        {userData?.swipesLeft ?? 0} swipes
-                        <br />
-                        ⚡ {userData?.superSwipesLeft ?? 0} super
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* MAIN SCROLLABLE CONTENT AREA */}
+              {/* Scrollable inner content */}
               <div className="flex-1 overflow-y-auto bg-gray-50 w-full">
                 {selectedMatch ? (
                   <ChatScreen
@@ -466,7 +470,7 @@ export default function App() {
           </div>
         </IonContent>
 
-        {/* BOTTOM TABS – fixed to screen via IonFooter */}
+        {/* FIXED BOTTOM TABS */}
         {!selectedMatch && (
           <IonFooter className="ion-no-border">
             <IonTabBar>
