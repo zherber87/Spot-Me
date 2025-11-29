@@ -108,7 +108,6 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
     }
 
     try {
-      // Check if email already has sign-in methods
       const methods = await fetchSignInMethodsForEmail(auth, email);
       if (methods && methods.length > 0) {
         setError(
@@ -117,7 +116,6 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
         return;
       }
 
-      // OK to proceed to profile step (no account created yet)
       setError('');
       setStep(2);
     } catch (err) {
@@ -149,15 +147,12 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
     onSignup(email, password, profileData);
   };
 
-  // ------------------------------------------------------------------
-  // UI
-  // ------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-start sm:items-center justify-center px-4 py-6">
+    <div className="w-full h-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center px-4 py-6">
       {/* Phone-style shell */}
       <div className="w-full max-w-md bg-slate-950/80 border border-white/10 rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden relative">
         {/* Top brand strip */}
-        <div className="bg-gradient-to-br from-rose-500 via-rose-400 to-orange-400 px-6 pt-7 pb-5 flex items-center justify-between">
+        <div className="bg-gradient-to-br from-rose-500 via-rose-400 to-orange-400 px-6 pt-6 pb-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-black/15 backdrop-blur-sm p-2.5 rounded-2xl shadow-inner">
               <Dumbbell className="text-white" size={26} />
@@ -172,7 +167,6 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
             </div>
           </div>
 
-          {/* Tiny app badge */}
           <div className="hidden sm:flex flex-col items-end text-[10px] text-white/80">
             <span className="px-2 py-0.5 rounded-full bg-black/20 font-semibold">
               Beta
@@ -367,9 +361,7 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
                             className="w-full bg-slate-50 border border-slate-200 rounded-xl py-2.5 pl-10 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"
                             placeholder="Repeat your password"
                             value={confirmPassword}
-                            onChange={e =>
-                              setConfirmPassword(e.target.value)
-                            }
+                            onChange={e => setConfirmPassword(e.target.value)}
                           />
                         </div>
                       </div>
