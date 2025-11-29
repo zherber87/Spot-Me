@@ -89,7 +89,7 @@ export default function App() {
 
   // -------------------- AUTH LISTENER --------------------
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async currentUser => {
       console.log('Auth state changed:', currentUser);
       setUser(currentUser);
 
@@ -101,9 +101,7 @@ export default function App() {
           if (snap.exists()) {
             setUserData(snap.data());
           } else {
-            // Existing auth user but no profile doc yet
             setUserData({
-              onboarded: false,
               swipesLeft: DAILY_SWIPE_LIMIT,
               superSwipesLeft: SUPER_SWIPE_DEFAULT,
               isPremium: false,
@@ -130,8 +128,7 @@ export default function App() {
         !userData.name ||
         !userData.age ||
         !userData.favoriteWorkouts ||
-        userData.favoriteWorkouts.length === 0 ||
-        !userData.photoURL;
+        userData.favoriteWorkouts.length === 0;
 
       setShowCompleteProfile(incomplete);
     } else {
@@ -148,18 +145,17 @@ export default function App() {
         const q = query(collection(db, 'users'), where('onboarded', '==', true));
         const snapshot = await getDocs(q);
         const users = snapshot.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          .filter((u) => u.id !== user.uid);
+          .map(d => ({ id: d.id, ...d.data() }))
+          .filter(u => u.id !== user.uid);
 
         if (users.length === 0) {
-          // probably the only real user – show demo profiles so UI isn’t empty
           setProfiles(DEMO_PROFILES);
         } else {
           setProfiles(users);
         }
       } catch (err) {
         console.error('Error fetching profiles:', err);
-        setProfiles(DEMO_PROFILES); // fallback so Discover never looks dead
+        setProfiles(DEMO_PROFILES);
       }
     };
 
@@ -174,10 +170,10 @@ export default function App() {
       collection(db, 'matches'),
       where('userIds', 'array-contains', user.uid)
     );
-    const unsub = onSnapshot(q, (snapshot) => {
-      const matchData = snapshot.docs.map((docSnap) => {
+    const unsub = onSnapshot(q, snapshot => {
+      const matchData = snapshot.docs.map(docSnap => {
         const data = docSnap.data();
-        const otherId = data.userIds?.find((id) => id !== user.uid);
+        const otherId = data.userIds?.find(id => id !== user.uid);
         const otherUser =
           data.userSnapshots?.[otherId] || { name: 'User', emoji: '👤' };
         return { id: docSnap.id, ...data, otherUser };
@@ -194,12 +190,10 @@ export default function App() {
       setAuthLoading(true);
 
       if (!isSignup) {
-        // LOGIN
         await signInWithEmailAndPassword(auth, email, password);
         return;
       }
 
-      // SIGNUP + ONBOARDING IN ONE
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       const uid = cred.user.uid;
 
@@ -219,10 +213,10 @@ export default function App() {
         tags: profileData.favoriteWorkouts || [],
         favoriteWorkouts: profileData.favoriteWorkouts || [],
         bio: profileData.bio || '',
-        photoURL: photoURL,
-        onboarded: true, // so they show in Discover
-        swipesLeft: DAILY_SWIPE_LIMIT,           // 50 swipes
-        superSwipesLeft: SUPER_SWIPE_DEFAULT,    // 2 super swipes
+        photoURL,
+        onboarded: true,
+        swipesLeft: DAILY_SWIPE_LIMIT,
+        superSwipesLeft: SUPER_SWIPE_DEFAULT,
         isPremium: false,
         createdAt: serverTimestamp(),
       };
@@ -242,25 +236,16 @@ export default function App() {
     if (!user || !userData || !targetProfile) return;
     if (direction === 'left') return;
 
-    // decrement swipes if not premium
     if (!userData.isPremium) {
       await updateDoc(doc(db, 'users', user.uid), {
         swipesLeft: increment(-1),
       });
-      setUserData((prev) =>
-        prev
-          ? { ...prev, swipesLeft: (prev.swipesLeft || 1) - 1 }
-          : prev
+      setUserData(prev =>
+        prev ? { ...prev, swipesLeft: (prev.swipesLeft || 1) - 1 } : prev
       );
     }
 
-    const theirLikeRef = doc(
-      db,
-      'users',
-      targetProfile.id,
-      'likes',
-      user.uid
-    );
+    const theirLikeRef = doc(db, 'users', targetProfile.id, 'likes', user.uid);
     const theirLikeSnap = await getDoc(theirLikeRef);
 
     if (theirLikeSnap.exists()) {
@@ -284,9 +269,7 @@ export default function App() {
     } else {
       await setDoc(
         doc(db, 'users', user.uid, 'likes', targetProfile.id),
-        {
-          timestamp: serverTimestamp(),
-        }
+        { timestamp: serverTimestamp() }
       );
     }
   };
@@ -296,10 +279,10 @@ export default function App() {
     if (!user) return;
     await updateDoc(doc(db, 'users', user.uid), {
       isPremium: true,
-      swipesLeft: 99999,            // effectively unlimited
-      superSwipesLeft: 20,          // more super swipes as paid perk
+      swipesLeft: 99999,
+      superSwipesLeft: 20,
     });
-    setUserData((prev) =>
+    setUserData(prev =>
       prev ? { ...prev, isPremium: true, swipesLeft: 99999, superSwipesLeft: 20 } : prev
     );
     setShowPremium(false);
@@ -328,7 +311,7 @@ export default function App() {
       <IonApp>
         <IonPage>
           <IonContent className="flex items-center justify-center bg-gray-200">
-            <div className="w-full max-w-md h-[100dvh] bg-white sm:h-[850px] sm:rounded-3xl overflow-hidden shadow-2xl">
+            <div className="w-full max-w-md h-[100dvh] sm:h-[850px] sm:rounded-3xl overflow-hidden shadow-2xl">
               <AuthScreen
                 onLogin={(e, p) => handleAuth(false, e, p)}
                 onSignup={(e, p, profile) => handleAuth(true, e, p, profile)}
@@ -345,166 +328,175 @@ export default function App() {
   return (
     <IonApp>
       <IonPage>
-        {/* no flex-center here so header isn’t pushed off-screen on iPhone */}
-        <IonContent className="bg-gray-200 font-sans text-gray-900">
-          <div className="w-full max-w-md h-full min-h-[100dvh] bg-white sm:h-[850px] sm:rounded-3xl sm:border-8 sm:border-gray-800 sm:shadow-2xl overflow-hidden flex flex-col relative mx-auto">
-            {showPremium && (
-              <PremiumModal
-                onClose={() => setShowPremium(false)}
-                onUpgrade={handleUpgrade}
-              />
-            )}
-
-            {/* 🔔 Finish profile popup for incomplete accounts */}
-            {showCompleteProfile && !selectedMatch && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-30">
-                <div className="bg-white rounded-2xl p-5 w-80 shadow-xl">
-                  <h3 className="font-bold text-lg mb-1">Finish your profile</h3>
-                  <p className="text-sm text-gray-500 mb-4">
-                    Add your name, age, workouts, and a photo so people know who
-                    they&apos;re matching with.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setActiveTab('profile');
-                      setShowCompleteProfile(false);
-                    }}
-                    className="w-full mb-2 py-2.5 rounded-xl bg-rose-500 text-white text-sm font-semibold"
-                  >
-                    Complete profile
-                  </button>
-                  <button
-                    onClick={() => setShowCompleteProfile(false)}
-                    className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-600 text-xs font-semibold"
-                  >
-                    Maybe later
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* HEADER */}
-            {!selectedMatch && (
-              <div className="h-16 px-6 flex items-center justify-between bg-white z-20 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <div className="bg-rose-500 p-1.5 rounded-lg">
-                    <Dumbbell className="text-white" size={20} />
-                  </div>
-                  <h1 className="text-2xl font-black italic text-gray-800">
-                    Spot<span className="text-rose-500">Me</span>
-                  </h1>
-                </div>
-                <div className="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full leading-tight text-right">
-                  {userData?.isPremium ? (
-                    'GOLD'
-                  ) : (
-                    <>
-                      {userData?.swipesLeft ?? 0} swipes
-                      <br />
-                      ⚡ {userData?.superSwipesLeft ?? 0} super
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* MAIN CONTENT */}
-            <div className="flex-1 overflow-hidden relative bg-gray-50 w-full">
-              {selectedMatch ? (
-                <ChatScreen
-                  match={selectedMatch}
-                  onBack={() => setSelectedMatch(null)}
-                  currentUser={user}
-                  db={db}
+        {/* no flex-center here – we want full height layout */}
+        <IonContent fullscreen className="bg-gray-200 font-sans text-gray-900">
+          {/* outer flex just centers horizontally; on desktop also vertically via sm:items-center */}
+          <div className="h-full flex justify-center sm:items-center">
+            <div
+              className="
+                w-full max-w-md h-full
+                sm:h-[850px] sm:rounded-3xl sm:border-8 sm:border-gray-800 sm:shadow-2xl
+                bg-white flex flex-col relative mx-auto
+              "
+            >
+              {showPremium && (
+                <PremiumModal
+                  onClose={() => setShowPremium(false)}
+                  onUpgrade={handleUpgrade}
                 />
-              ) : activeTab === 'discover' ? (
-                <DiscoverScreen
-                  profiles={profiles}
-                  onSwipe={handleSwipe}
-                  user={userData}
-                  onTriggerPremium={() => setShowPremium(true)}
-                />
-              ) : activeTab === 'matches' ? (
-                <MatchesScreen
-                  matches={matches}
-                  onSelectMatch={setSelectedMatch}
-                />
-              ) : (
-                <div className="p-8">
-                  <h2 className="text-2xl font-bold mb-4">Profile</h2>
-                  <div className="bg-white p-4 rounded-xl shadow mb-4 flex gap-4 items-center">
-                    {userData?.photoURL && (
-                      <img
-                        src={userData.photoURL}
-                        alt="Profile"
-                        className="w-12 h-12 rounded-full object-cover border border-gray-200"
-                      />
-                    )}
-                    <div>
-                      <p className="font-bold text-lg">
-                        {userData?.name || user.email}
-                      </p>
-                      <p className="text-gray-500 text-sm">
-                        {userData?.gym || 'No Gym Set'}
-                      </p>
-                      {userData?.favoriteWorkouts?.length > 0 && (
-                        <p className="text-xs text-gray-400 mt-1">
-                          Likes: {userData.favoriteWorkouts.join(', ')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  {!userData?.isPremium && (
+              )}
+
+              {/* Finish profile popup overlay */}
+              {showCompleteProfile && !selectedMatch && (
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-30">
+                  <div className="bg-white rounded-2xl p-5 w-80 shadow-xl">
+                    <h3 className="font-bold text-lg mb-1">Finish your profile</h3>
+                    <p className="text-sm text-gray-500 mb-4">
+                      Add your name, age, workouts, and a photo so people know who
+                      they&apos;re matching with.
+                    </p>
                     <button
-                      onClick={() => setShowPremium(true)}
-                      className="mb-4 w-full py-2 bg-yellow-400 font-bold rounded-lg text-yellow-900 flex items-center justify-center gap-2"
+                      onClick={() => {
+                        setActiveTab('profile');
+                        setShowCompleteProfile(false);
+                      }}
+                      className="w-full mb-2 py-2.5 rounded-xl bg-rose-500 text-white text-sm font-semibold"
                     >
-                      <Star size={16} /> Upgrade
+                      Complete profile
                     </button>
-                  )}
-                  <button
-                    onClick={handleLogout}
-                    className="text-red-500 font-bold text-sm"
-                  >
-                    Log Out
-                  </button>
+                    <button
+                      onClick={() => setShowCompleteProfile(false)}
+                      className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-600 text-xs font-semibold"
+                    >
+                      Maybe later
+                    </button>
+                  </div>
                 </div>
               )}
-            </div>
 
-            {/* TABS */}
-            {!selectedMatch && (
-              <IonFooter className="ion-no-border">
-                <IonTabBar>
-                  <IonTabButton
-                    tab="discover"
-                    onClick={() => setActiveTab('discover')}
-                    selected={activeTab === 'discover'}
-                  >
-                    <IonIcon icon={fitnessOutline} />
-                    <IonLabel>Discover</IonLabel>
-                  </IonTabButton>
-                  <IonTabButton
-                    tab="matches"
-                    onClick={() => setActiveTab('matches')}
-                    selected={activeTab === 'matches'}
-                  >
-                    <IonIcon icon={chatbubblesOutline} />
-                    <IonLabel>Matches</IonLabel>
-                  </IonTabButton>
-                  <IonTabButton
-                    tab="profile"
-                    onClick={() => setActiveTab('profile')}
-                    selected={activeTab === 'profile'}
-                  >
-                    <IonIcon icon={personOutline} />
-                    <IonLabel>Profile</IonLabel>
-                  </IonTabButton>
-                </IonTabBar>
-              </IonFooter>
-            )}
+              {/* HEADER (fixed at top of shell) */}
+              {!selectedMatch && (
+                <div className="h-16 px-6 flex items-center justify-between bg-white z-20 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="bg-rose-500 p-1.5 rounded-lg">
+                      <Dumbbell className="text-white" size={20} />
+                    </div>
+                    <h1 className="text-2xl font-black italic text-gray-800">
+                      Spot<span className="text-rose-500">Me</span>
+                    </h1>
+                  </div>
+                  <div className="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full leading-tight text-right">
+                    {userData?.isPremium ? (
+                      'GOLD'
+                    ) : (
+                      <>
+                        {userData?.swipesLeft ?? 0} swipes
+                        <br />
+                        ⚡ {userData?.superSwipesLeft ?? 0} super
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* MAIN SCROLLABLE CONTENT AREA */}
+              <div className="flex-1 overflow-y-auto bg-gray-50 w-full">
+                {selectedMatch ? (
+                  <ChatScreen
+                    match={selectedMatch}
+                    onBack={() => setSelectedMatch(null)}
+                    currentUser={user}
+                    db={db}
+                  />
+                ) : activeTab === 'discover' ? (
+                  <DiscoverScreen
+                    profiles={profiles}
+                    onSwipe={handleSwipe}
+                    user={userData}
+                    onTriggerPremium={() => setShowPremium(true)}
+                  />
+                ) : activeTab === 'matches' ? (
+                  <MatchesScreen
+                    matches={matches}
+                    onSelectMatch={setSelectedMatch}
+                  />
+                ) : (
+                  <div className="p-8">
+                    <h2 className="text-2xl font-bold mb-4">Profile</h2>
+                    <div className="bg-white p-4 rounded-xl shadow mb-4 flex gap-4 items-center">
+                      {userData?.photoURL && (
+                        <img
+                          src={userData.photoURL}
+                          alt="Profile"
+                          className="w-12 h-12 rounded-full object-cover border border-gray-200"
+                        />
+                      )}
+                      <div>
+                        <p className="font-bold text-lg">
+                          {userData?.name || user.email}
+                        </p>
+                        <p className="text-gray-500 text-sm">
+                          {userData?.gym || 'No Gym Set'}
+                        </p>
+                        {userData?.favoriteWorkouts?.length > 0 && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Likes: {userData.favoriteWorkouts.join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {!userData?.isPremium && (
+                      <button
+                        onClick={() => setShowPremium(true)}
+                        className="mb-4 w-full py-2 bg-yellow-400 font-bold rounded-lg text-yellow-900 flex items-center justify-center gap-2"
+                      >
+                        <Star size={16} /> Upgrade
+                      </button>
+                    )}
+                    <button
+                      onClick={handleLogout}
+                      className="text-red-500 font-bold text-sm"
+                    >
+                      Log Out
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </IonContent>
+
+        {/* BOTTOM TABS – fixed to screen via IonFooter */}
+        {!selectedMatch && (
+          <IonFooter className="ion-no-border">
+            <IonTabBar>
+              <IonTabButton
+                tab="discover"
+                onClick={() => setActiveTab('discover')}
+                selected={activeTab === 'discover'}
+              >
+                <IonIcon icon={fitnessOutline} />
+                <IonLabel>Discover</IonLabel>
+              </IonTabButton>
+              <IonTabButton
+                tab="matches"
+                onClick={() => setActiveTab('matches')}
+                selected={activeTab === 'matches'}
+              >
+                <IonIcon icon={chatbubblesOutline} />
+                <IonLabel>Matches</IonLabel>
+              </IonTabButton>
+              <IonTabButton
+                tab="profile"
+                onClick={() => setActiveTab('profile')}
+                selected={activeTab === 'profile'}
+              >
+                <IonIcon icon={personOutline} />
+                <IonLabel>Profile</IonLabel>
+              </IonTabButton>
+            </IonTabBar>
+          </IonFooter>
+        )}
       </IonPage>
     </IonApp>
   );
