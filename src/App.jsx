@@ -101,8 +101,9 @@ export default function App() {
           if (snap.exists()) {
             setUserData(snap.data());
           } else {
-            // If somehow they have auth but no profile, treat as minimal user
+            // Existing auth user but no profile doc yet
             setUserData({
+              onboarded: false,
               swipesLeft: DAILY_SWIPE_LIMIT,
               superSwipesLeft: SUPER_SWIPE_DEFAULT,
               isPremium: false,
@@ -129,7 +130,8 @@ export default function App() {
         !userData.name ||
         !userData.age ||
         !userData.favoriteWorkouts ||
-        userData.favoriteWorkouts.length === 0;
+        userData.favoriteWorkouts.length === 0 ||
+        !userData.photoURL;
 
       setShowCompleteProfile(incomplete);
     } else {
@@ -150,7 +152,7 @@ export default function App() {
           .filter((u) => u.id !== user.uid);
 
         if (users.length === 0) {
-          // you’re probably the only real user – show demo profiles so UI isn’t empty
+          // probably the only real user – show demo profiles so UI isn’t empty
           setProfiles(DEMO_PROFILES);
         } else {
           setProfiles(users);
@@ -343,7 +345,7 @@ export default function App() {
   return (
     <IonApp>
       <IonPage>
-        {/* 🔧 IMPORTANT: remove flex-center here so header isn’t pushed off-screen on iPhone */}
+        {/* no flex-center here so header isn’t pushed off-screen on iPhone */}
         <IonContent className="bg-gray-200 font-sans text-gray-900">
           <div className="w-full max-w-md h-full min-h-[100dvh] bg-white sm:h-[850px] sm:rounded-3xl sm:border-8 sm:border-gray-800 sm:shadow-2xl overflow-hidden flex flex-col relative mx-auto">
             {showPremium && (
