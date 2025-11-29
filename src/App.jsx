@@ -55,6 +55,7 @@ export default function App() {
   const [matches, setMatches] = useState([]);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [showPremium, setShowPremium] = useState(false);
+  const [showCompleteProfile, setShowCompleteProfile] = useState(false);
 
   // AUTH LISTENER
   useEffect(() => {
@@ -89,6 +90,21 @@ export default function App() {
 
     return () => unsubscribe();
   }, []);
+
+  // SHOW "FINISH PROFILE" POPUP FOR INCOMPLETE USERS
+  useEffect(() => {
+    if (user && userData) {
+      const incomplete =
+        !userData.name ||
+        !userData.age ||
+        !userData.favoriteWorkouts ||
+        userData.favoriteWorkouts.length === 0;
+
+      setShowCompleteProfile(incomplete);
+    } else {
+      setShowCompleteProfile(false);
+    }
+  }, [user, userData]);
 
   // FETCH PROFILES
   useEffect(() => {
@@ -206,7 +222,11 @@ export default function App() {
       await addDoc(collection(db, 'matches'), {
         userIds: [user.uid, targetProfile.id],
         userSnapshots: {
-          [user.uid]: { name: userData.name, emoji: '💪', photoURL: userData.photoURL },
+          [user.uid]: {
+            name: userData.name,
+            emoji: '💪',
+            photoURL: userData.photoURL || null,
+          },
           [targetProfile.id]: {
             name: targetProfile.name,
             emoji: targetProfile.emoji || '🏋️‍♂️',
@@ -286,6 +306,34 @@ export default function App() {
                 onClose={() => setShowPremium(false)}
                 onUpgrade={handleUpgrade}
               />
+            )}
+
+            {/* 🔔 Finish profile popup for incomplete accounts */}
+            {showCompleteProfile && !selectedMatch && (
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-30">
+                <div className="bg-white rounded-2xl p-5 w-80 shadow-xl">
+                  <h3 className="font-bold text-lg mb-1">Finish your profile</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Add your name, age, workouts, and a photo so people know who
+                    they&apos;re matching with.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setActiveTab('profile');
+                      setShowCompleteProfile(false);
+                    }}
+                    className="w-full mb-2 py-2.5 rounded-xl bg-rose-500 text-white text-sm font-semibold"
+                  >
+                    Complete profile
+                  </button>
+                  <button
+                    onClick={() => setShowCompleteProfile(false)}
+                    className="w-full py-2.5 rounded-xl bg-gray-100 text-gray-600 text-xs font-semibold"
+                  >
+                    Maybe later
+                  </button>
+                </div>
+              </div>
             )}
 
             {!selectedMatch && (

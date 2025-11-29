@@ -1,6 +1,15 @@
 // src/components/AuthScreen.jsx
 import React, { useState } from 'react';
-import { Dumbbell, Mail, Lock, User, Camera, Check, Building, Ticket } from 'lucide-react';
+import {
+  Dumbbell,
+  Mail,
+  Lock,
+  User,
+  Camera,
+  Check,
+  Building,
+  Ticket,
+} from 'lucide-react';
 
 const WORKOUT_OPTIONS = [
   'Weightlifting',
@@ -13,7 +22,7 @@ const WORKOUT_OPTIONS = [
 ];
 
 export function AuthScreen({ onLogin, onSignup, loading }) {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState('login'); // 'login' | 'signup'
   const [step, setStep] = useState(1); // 1 = auth, 2 = onboarding
 
   // Step 1 (auth)
@@ -25,18 +34,18 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
   const [age, setAge] = useState('');
   const [gym, setGym] = useState('');
   const [guestPass, setGuestPass] = useState(false);
-  const [favoriteWorkouts, setFavoriteWorkouts] = useState<string[]>([]);
+  const [favoriteWorkouts, setFavoriteWorkouts] = useState([]); // no <string[]>
   const [bio, setBio] = useState('');
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState(null); // no File | null
+  const [photoPreview, setPhotoPreview] = useState(null);
 
-  const toggleWorkout = (w: string) => {
-    setFavoriteWorkouts(prev =>
-      prev.includes(w) ? prev.filter(x => x !== w) : [...prev, w]
+  const toggleWorkout = (w) => {
+    setFavoriteWorkouts((prev) =>
+      prev.includes(w) ? prev.filter((x) => x !== w) : [...prev, w]
     );
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoFile(file);
@@ -55,13 +64,13 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
     setPhotoPreview(null);
   };
 
-  const switchMode = (nextMode: 'login' | 'signup') => {
+  const switchMode = (nextMode) => {
     setMode(nextMode);
     setStep(1);
     resetProfile();
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (mode === 'login') {
@@ -70,7 +79,6 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
 
     // SIGNUP
     if (step === 1) {
-      // Basic validation before going to onboarding
       if (!email || !password) {
         alert('Please enter email and password.');
         return;
@@ -132,7 +140,9 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
           <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
             <span
               className={`w-6 h-6 flex items-center justify-center rounded-full ${
-                step === 1 ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-500'
+                step === 1
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-rose-100 text-rose-500'
               }`}
             >
               1
@@ -141,7 +151,9 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
             <span className="w-6 border-t border-gray-300 mx-1" />
             <span
               className={`w-6 h-6 flex items-center justify-center rounded-full ${
-                step === 2 ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-500'
+                step === 2
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-rose-100 text-rose-500'
               }`}
             >
               2
@@ -162,7 +174,7 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
                 type="email"
                 placeholder="Email"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-11 pr-4 focus:ring-2 focus:ring-rose-500 outline-none text-sm"
                 required
               />
@@ -175,7 +187,7 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
                 type="password"
                 placeholder="Password"
                 value={password}
-                onChange={e => setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-11 pr-4 focus:ring-2 focus:ring-rose-500 outline-none text-sm"
                 required
               />
@@ -185,7 +197,7 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
 
         {/* PROFILE STEP */}
         {showProfileStep && (
-          <div className="space-y-4 animate-in slide-in-from-right">
+          <div className="space-y-4">
             {/* Photo */}
             <div className="flex items-center gap-4">
               <div className="relative">
@@ -224,7 +236,7 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
                   type="text"
                   placeholder="First name"
                   value={name}
-                  onChange={e => setName(e.target.value)}
+                  onChange={(e) => setName(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-3 focus:ring-2 focus:ring-rose-500 outline-none text-sm"
                 />
               </div>
@@ -234,7 +246,7 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
                 max="99"
                 placeholder="Age"
                 value={age}
-                onChange={e => setAge(e.target.value)}
+                onChange={(e) => setAge(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 px-3 focus:ring-2 focus:ring-rose-500 outline-none text-sm"
               />
             </div>
@@ -247,13 +259,13 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
                   type="text"
                   placeholder="Home gym (optional)"
                   value={gym}
-                  onChange={e => setGym(e.target.value)}
+                  onChange={(e) => setGym(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl py-3 pl-10 pr-3 focus:ring-2 focus:ring-rose-500 outline-none text-sm"
                 />
               </div>
               <button
                 type="button"
-                onClick={() => setGuestPass(v => !v)}
+                onClick={() => setGuestPass((v) => !v)}
                 className={`w-full flex items-center justify-between px-3 py-3 rounded-xl border text-xs font-semibold ${
                   guestPass
                     ? 'border-amber-400 bg-amber-50 text-amber-700'
@@ -278,7 +290,7 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
                 Favorite types of workouts (pick at least one)
               </p>
               <div className="flex flex-wrap gap-2">
-                {WORKOUT_OPTIONS.map(w => {
+                {WORKOUT_OPTIONS.map((w) => {
                   const active = favoriteWorkouts.includes(w);
                   return (
                     <button
@@ -303,7 +315,7 @@ export function AuthScreen({ onLogin, onSignup, loading }) {
               <textarea
                 placeholder="Tell people what you’re looking for (times you train, goals, etc.)"
                 value={bio}
-                onChange={e => setBio(e.target.value)}
+                onChange={(e) => setBio(e.target.value)}
                 className="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm resize-none h-24 focus:ring-2 focus:ring-rose-500 outline-none"
               />
             </div>
