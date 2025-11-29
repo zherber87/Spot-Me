@@ -105,7 +105,60 @@ function FilterSheet({ open, onClose, current, onApply, isPremium }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-40">
       <div className="w-full max-w-md bg-white rounded-t-3xl p-5 pb-6 shadow-2xl">
-        {/* ...unchanged filter content... */}
+        <h3 className="text-xl font-bold mb-4">Filters</h3>
+        
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Looking for</label>
+          <div className="flex gap-2">
+            {['any', 'workout', 'coach'].map((type) => (
+              <button
+                key={type}
+                onClick={() => setIntent(type)}
+                className={`px-4 py-2 rounded-full text-sm capitalize ${
+                  intent === type ? 'bg-rose-500 text-white' : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {isPremium ? (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Distance ({distance}mi)</label>
+              <input 
+                type="range" 
+                min="1" max="100" 
+                value={distance} 
+                onChange={(e) => setDistance(Number(e.target.value))}
+                className="w-full accent-rose-500"
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Specific Gym/Location</label>
+              <input 
+                type="text" 
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g. Gold's Gym Venice"
+                className="w-full p-3 bg-gray-100 rounded-xl"
+              />
+            </div>
+          </>
+        ) : (
+          <div className="mb-6 p-4 bg-yellow-50 rounded-xl text-sm text-yellow-800 border border-yellow-200">
+             Upgrade to Premium to filter by distance and specific gyms.
+          </div>
+        )}
+
+        <button 
+            onClick={apply}
+            className="w-full py-3 bg-rose-500 text-white font-bold rounded-xl"
+        >
+            Apply Filters
+        </button>
       </div>
     </div>
   );
@@ -114,8 +167,15 @@ function FilterSheet({ open, onClose, current, onApply, isPremium }) {
 // -------------------- LIKES SCREEN --------------------
 function LikesScreen({ likes }) {
   return (
-    <div className="h-full overflow-y-auto bg-gray-50">
-      {/* ...unchanged likes UI... */}
+    <div className="h-full overflow-y-auto bg-gray-50 p-4">
+      <h2 className="text-2xl font-bold mb-4">Your Likes</h2>
+      {likes.length === 0 ? (
+        <div className="text-center text-gray-500 mt-10">No likes yet.</div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4">
+           {/* Add map logic here if needed */}
+        </div>
+      )}
     </div>
   );
 }
@@ -140,7 +200,96 @@ export default function App() {
     location: '',
   });
 
-  // --- all your useEffects + handleAuth + handleSwipe + handleUpgrade + handleLogout + handleLikesIcon stay the same ---
+  // -------------------- RESTORED LOGIC --------------------
+  
+  // 1. Auth Observer
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        // Fetch user data from Firestore
+        const docRef = doc(db, 'users', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setUserData(docSnap.data());
+        }
+        // Load demo profiles for swipe deck
+        setProfiles(DEMO_PROFILES);
+      } else {
+        setUserData(null);
+      }
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  // 2. Handle Auth (Login/Signup)
+  const handleAuth = async (isSignup, email, password, profileData) => {
+    setAuthLoading(true);
+    try {
+      if (isSignup) {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = userCredential.user.uid;
+        
+        // Initial user document
+        const newUserData = {
+            uid,
+            email,
+            ...profileData,
+            isPremium: false,
+            superSwipes: SUPER_SWIPE_DEFAULT,
+            swipesLeft: DAILY_SWIPE_LIMIT,
+            createdAt: serverTimestamp(),
+        };
+
+        await setDoc(doc(db, 'users', uid), newUserData);
+        setUserData(newUserData);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (error) {
+      console.error("Auth error:", error);
+      alert(error.message);
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  // 3. Handle Logout
+  const handleLogout = async () => {
+    await signOut(auth);
+    setActiveTab('discover');
+  };
+
+  // 4. Handle Upgrade
+  const handleUpgrade = async () => {
+    if (!user) return;
+    try {
+        await updateDoc(doc(db, 'users', user.uid), {
+            isPremium: true,
+            superSwipes: increment(5)
+        });
+        setUserData(prev => ({ ...prev, isPremium: true }));
+        setShowPremium(false);
+        alert("Welcome to Premium!");
+    } catch (err) {
+        console.error(err);
+    }
+  };
+
+  // 5. Handle Swipe
+  const handleSwipe = async (direction, profile) => {
+    if (!user) return;
+    
+    // Remove card from UI immediately
+    setProfiles((prev) => prev.filter((p) => p.id !== profile.id));
+
+    if (direction === 'right') {
+        // Record the like in Firestore (simplified)
+        // Check for match logic would go here
+        console.log("Liked:", profile.name);
+    }
+  };
 
   // -------------------- RENDER STATES --------------------
   if (loading) {
@@ -175,10 +324,9 @@ export default function App() {
   return (
     <IonApp>
       <IonPage>
-        {/* ✨ KEY CHANGE: make content a flex-center horizontally, no vertical scroll */}
         <IonContent className="bg-gray-200 font-sans text-gray-900 flex justify-center">
-          {/* ✨ KEY CHANGE: phone shell uses h-screen so bottom nav is always at viewport bottom */}
           <div className="w-full max-w-md h-screen sm:h-[850px] sm:my-6 bg-white sm:rounded-3xl sm:border-8 sm:border-gray-800 sm:shadow-2xl overflow-hidden flex flex-col relative">
+            
             {showPremium && (
               <PremiumModal
                 onClose={() => setShowPremium(false)}
@@ -186,15 +334,27 @@ export default function App() {
               />
             )}
 
-            {/* finish profile popup stays the same */}
-
             {!selectedMatch && (
               <div className="h-16 px-5 flex items-center justify-between bg-white z-20 shadow-sm">
-                {/* header content unchanged */}
+                <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-rose-500 rounded-full flex items-center justify-center text-white font-bold">
+                        Fit
+                    </div>
+                    <span className="font-bold text-xl tracking-tight">GymRat</span>
+                </div>
+                <div className="flex gap-4">
+                    <button onClick={() => setShowFilter(true)}>
+                        <SlidersHorizontal size={22} className="text-gray-600" />
+                    </button>
+                    <button onClick={handleLogout}>
+                         {/* Simple logout trigger */}
+                        <UserIcon size={22} className="text-gray-600" />
+                    </button>
+                </div>
               </div>
             )}
 
-            {/* MAIN CONTENT – this takes remaining space between header and bottom nav */}
+            {/* MAIN CONTENT */}
             <div className="flex-1 overflow-hidden relative bg-gray-50 w-full">
               {selectedMatch ? (
                 <ChatScreen
@@ -218,13 +378,14 @@ export default function App() {
               ) : activeTab === 'likes' ? (
                 <LikesScreen likes={likes} />
               ) : (
-                <div className="h-full overflow-y-auto p-8">
-                  {/* profile content unchanged */}
+                <div className="h-full overflow-y-auto p-8 flex flex-col items-center">
+                   <h2 className="text-2xl font-bold mb-4">{userData?.name || 'User'}</h2>
+                   <button onClick={handleLogout} className="text-red-500 font-bold">Log Out</button>
                 </div>
               )}
             </div>
 
-            {/* ✨ BOTTOM NAV: sits at bottom of the shell (which is h-screen) */}
+            {/* BOTTOM NAV */}
             {!selectedMatch && (
               <div className="h-16 border-t border-gray-200 bg-white flex items-center justify-around">
                 <button
@@ -258,7 +419,6 @@ export default function App() {
             )}
           </div>
 
-          {/* FILTER SHEET OVERLAY (full-screen) */}
           <FilterSheet
             open={showFilter}
             onClose={() => setShowFilter(false)}
