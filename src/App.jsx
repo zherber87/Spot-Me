@@ -488,7 +488,7 @@ export default function SpotMeApp() {
      setDoc: setDoc,
      updateDoc: updateDoc,
      getDoc: getDoc,
-    /addDoc: addDoc,
+     addDoc: addDoc,
      increment: increment,
      serverTimestamp: serverTimestamp
   } : {
