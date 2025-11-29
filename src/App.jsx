@@ -12,7 +12,7 @@ import {
 } from '@ionic/react';
 import { fitnessOutline, chatbubblesOutline, personOutline } from 'ionicons/icons';
 
-import { auth, db } from './firebase';
+import { auth, db, storage } from './firebase';
 import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -33,12 +33,12 @@ import {
   onSnapshot,
   serverTimestamp,
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { Dumbbell, Star } from 'lucide-react';
 
 import { PremiumModal } from './components/PremiumModal';
 import { AuthScreen } from './components/AuthScreen';
-import { OnboardingScreen } from './components/OnboardingScreen';
 import { DiscoverScreen } from './components/DiscoverScreen';
 import { MatchesScreen } from './components/MatchesScreen';
 import { ChatScreen } from './components/ChatScreen';
@@ -49,6 +49,7 @@ export default function App() {
   const [user, setUser] = useState(null);          // Firebase Auth user
   const [userData, setUserData] = useState(null);  // Firestore user document
   const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(false); // button spinner
   const [activeTab, setActiveTab] = useState('discover');
   const [profiles, setProfiles] = useState([]);
   const [matches, setMatches] = useState([]);
@@ -57,41 +58,33 @@ export default function App() {
 
   // AUTH LISTENER
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       console.log('Auth state changed:', currentUser);
       setUser(currentUser);
 
-      const loadUserDoc = async () => {
-        try {
-          if (currentUser) {
-            const userRef = doc(db, 'users', currentUser.uid);
-            const snap = await getDoc(userRef);
+      try {
+        if (currentUser) {
+          const userRef = doc(db, 'users', currentUser.uid);
+          const snap = await getDoc(userRef);
 
-            if (snap.exists()) {
-              setUserData(snap.data());
-            } else {
-              // New user, create default state in memory
-              setUserData({
-                onboarded: false,
-                swipesLeft: DAILY_SWIPE_LIMIT,
-                isPremium: false,
-              });
-            }
+          if (snap.exists()) {
+            setUserData(snap.data());
           } else {
-            // Not logged in
-            setUserData(null);
+            // If somehow they have auth but no profile, treat as minimal user
+            setUserData({
+              swipesLeft: DAILY_SWIPE_LIMIT,
+              isPremium: false,
+            });
           }
-        } catch (err) {
-          console.error('Error loading user document:', err);
-          // Fail-safe: treat as logged-out / no profile
+        } else {
           setUserData(null);
-        } finally {
-          // Always clear loading, even on error
-          setLoading(false);
         }
-      };
-
-      loadUserDoc();
+      } catch (err) {
+        console.error('Error loading user document:', err);
+        setUserData(null);
+      } finally {
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -99,7 +92,7 @@ export default function App() {
 
   // FETCH PROFILES
   useEffect(() => {
-    if (!user || !userData?.onboarded) return;
+    if (!user) return;
 
     const fetchProfiles = async () => {
       const q = query(collection(db, 'users'), where('onboarded', '==', true));
@@ -112,7 +105,7 @@ export default function App() {
     };
 
     fetchProfiles();
-  }, [user, userData]);
+  }, [user]);
 
   // FETCH MATCHES (realtime)
   useEffect(() => {
@@ -137,36 +130,55 @@ export default function App() {
   }, [user]);
 
   // AUTH ACTIONS
-  const handleAuth = async (isSignup, email, password) => {
+  const handleAuth = async (isSignup, email, password, profileData) => {
     try {
-      if (isSignup) {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await setDoc(doc(db, 'users', cred.user.uid), {
-          email,
-          onboarded: false,
-          swipesLeft: DAILY_SWIPE_LIMIT,
-          isPremium: false,
-          createdAt: serverTimestamp(),
-        });
-      } else {
+      setAuthLoading(true);
+
+      if (!isSignup) {
+        // LOGIN
         await signInWithEmailAndPassword(auth, email, password);
+        return;
       }
+
+      // SIGNUP + ONBOARDING IN ONE
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = cred.user.uid;
+
+      let photoURL = null;
+      if (profileData?.photoFile) {
+        const storageRef = ref(storage, `profilePhotos/${uid}`);
+        await uploadBytes(storageRef, profileData.photoFile);
+        photoURL = await getDownloadURL(storageRef);
+      }
+
+      const docData = {
+        email,
+        name: profileData.name,
+        age: profileData.age,
+        gym: profileData.gym || '',
+        guestPass: profileData.guestPass || false,
+        tags: profileData.favoriteWorkouts || [],
+        favoriteWorkouts: profileData.favoriteWorkouts || [],
+        bio: profileData.bio || '',
+        photoURL: photoURL,
+        onboarded: true, // so they show in Discover
+        swipesLeft: DAILY_SWIPE_LIMIT,
+        isPremium: false,
+        createdAt: serverTimestamp(),
+      };
+
+      await setDoc(doc(db, 'users', uid), docData);
+      setUserData(docData);
     } catch (err) {
+      console.error(err);
       alert(err.message);
+    } finally {
+      setAuthLoading(false);
     }
   };
 
-  const handleOnboarding = async (data) => {
-    if (!user) return;
-    await updateDoc(doc(db, 'users', user.uid), {
-      ...data,
-      onboarded: true,
-    });
-    setUserData((prev) => ({ ...(prev || {}), ...data, onboarded: true }));
-  };
-
   const handleSwipe = async (direction, targetProfile) => {
-    if (!user || !userData) return;
+    if (!user || !userData || !targetProfile) return;
     if (direction === 'left') return;
 
     // decrement swipes if not premium
@@ -194,10 +206,11 @@ export default function App() {
       await addDoc(collection(db, 'matches'), {
         userIds: [user.uid, targetProfile.id],
         userSnapshots: {
-          [user.uid]: { name: userData.name, emoji: userData.emoji },
+          [user.uid]: { name: userData.name, emoji: '💪', photoURL: userData.photoURL },
           [targetProfile.id]: {
             name: targetProfile.name,
-            emoji: targetProfile.emoji,
+            emoji: targetProfile.emoji || '🏋️‍♂️',
+            photoURL: targetProfile.photoURL || null,
           },
         },
         createdAt: serverTimestamp(),
@@ -252,23 +265,9 @@ export default function App() {
             <div className="w-full max-w-md h-[100dvh] bg-white sm:h-[850px] sm:rounded-3xl overflow-hidden shadow-2xl">
               <AuthScreen
                 onLogin={(e, p) => handleAuth(false, e, p)}
-                onSignup={(e, p) => handleAuth(true, e, p)}
-                loading={false}
+                onSignup={(e, p, profile) => handleAuth(true, e, p, profile)}
+                loading={authLoading}
               />
-            </div>
-          </IonContent>
-        </IonPage>
-      </IonApp>
-    );
-  }
-
-  if (userData && !userData.onboarded) {
-    return (
-      <IonApp>
-        <IonPage>
-          <IonContent className="flex items-center justify-center bg-gray-200">
-            <div className="w-full max-w-md h-[100dvh] bg-white sm:h-[850px] sm:rounded-3xl overflow-hidden shadow-2xl">
-              <OnboardingScreen onComplete={handleOnboarding} />
             </div>
           </IonContent>
         </IonPage>
@@ -299,13 +298,11 @@ export default function App() {
                     Spot<span className="text-rose-500">Me</span>
                   </h1>
                 </div>
-                {activeTab === 'discover' && (
-                  <div className="text-xs font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full">
-                    {userData?.isPremium
-                      ? 'GOLD'
-                      : `${userData?.swipesLeft ?? 0} Swipes`}
-                  </div>
-                )}
+                <div className="text-xs font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-full">
+                  {userData?.isPremium
+                    ? 'GOLD'
+                    : `${userData?.swipesLeft ?? 0} Swipes`}
+                </div>
               </div>
             )}
 
@@ -332,25 +329,39 @@ export default function App() {
               ) : (
                 <div className="p-8">
                   <h2 className="text-2xl font-bold mb-4">Profile</h2>
-                  <div className="bg-white p-4 rounded-xl shadow mb-4">
-                    <p className="font-bold text-lg">
-                      {userData?.name || user.email}
-                    </p>
-                    <p className="text-gray-500">
-                      {userData?.gym || 'No Gym Set'}
-                    </p>
-                    {!userData?.isPremium && (
-                      <button
-                        onClick={() => setShowPremium(true)}
-                        className="mt-4 w-full py-2 bg-yellow-400 font-bold rounded-lg text-yellow-900 flex items-center justify-center gap-2"
-                      >
-                        <Star size={16} /> Upgrade
-                      </button>
+                  <div className="bg-white p-4 rounded-xl shadow mb-4 flex gap-4 items-center">
+                    {userData?.photoURL && (
+                      <img
+                        src={userData.photoURL}
+                        alt="Profile"
+                        className="w-12 h-12 rounded-full object-cover border border-gray-200"
+                      />
                     )}
+                    <div>
+                      <p className="font-bold text-lg">
+                        {userData?.name || user.email}
+                      </p>
+                      <p className="text-gray-500 text-sm">
+                        {userData?.gym || 'No Gym Set'}
+                      </p>
+                      {userData?.favoriteWorkouts?.length > 0 && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Likes: {userData.favoriteWorkouts.join(', ')}
+                        </p>
+                      )}
+                    </div>
                   </div>
+                  {!userData?.isPremium && (
+                    <button
+                      onClick={() => setShowPremium(true)}
+                      className="mb-4 w-full py-2 bg-yellow-400 font-bold rounded-lg text-yellow-900 flex items-center justify-center gap-2"
+                    >
+                      <Star size={16} /> Upgrade
+                    </button>
+                  )}
                   <button
                     onClick={handleLogout}
-                    className="text-red-500 font-bold"
+                    className="text-red-500 font-bold text-sm"
                   >
                     Log Out
                   </button>
