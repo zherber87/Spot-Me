@@ -151,6 +151,18 @@ export default function App() {
 
       // Then asynchronously fetch the real Firestore profile and merge it in
       const fetchProfile = async () => {
+        // 🔌 If offline, skip Firestore call instead of throwing
+        if (
+          typeof navigator !== 'undefined' &&
+          navigator &&
+          navigator.onLine === false
+        ) {
+          console.warn(
+            'Skipping Firestore getDoc for user profile because navigator reports offline.'
+          );
+          return;
+        }
+
         try {
           const docRef = doc(db, 'users', currentUser.uid);
           const docSnap = await getDoc(docRef);
@@ -177,8 +189,9 @@ export default function App() {
             setUserData((prev) => ({ ...(prev || {}), ...fallback }));
           }
         } catch (e) {
-          console.error('Error fetching user profile:', e);
-          // If Firestore fails, we already have the optimistic userData
+          // This is the "client is offline" error you were seeing
+          console.warn('Error fetching user profile (non-fatal):', e);
+          // We keep the optimistic userData so ProfileScreen still works
         }
       };
 
@@ -204,7 +217,9 @@ export default function App() {
         navigator &&
         navigator.onLine === false
       ) {
-        console.warn('Skipping profile fetch because navigator reports offline.');
+        console.warn(
+          'Skipping discover profile fetch because navigator reports offline.'
+        );
         return;
       }
 
@@ -313,6 +328,15 @@ export default function App() {
   const handleUpgrade = async () => {
     if (!user || !db) return;
     try {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator &&
+        navigator.onLine === false
+      ) {
+        alert('You appear to be offline. Please connect to the internet to upgrade.');
+        return;
+      }
+
       await updateDoc(doc(db, 'users', user.uid), {
         isPremium: true,
         superSwipes: increment(5),
@@ -340,13 +364,31 @@ export default function App() {
   // 7. Save Profile (from ProfileScreen)
   const handleSaveProfile = async (updates) => {
     if (!user || !db) return;
+
+    // ✅ Optimistic UI update so changes appear instantly
+    setUserData((prev) => ({ ...(prev || {}), ...updates }));
+
+    // If offline, don't even try Firestore — just warn in console
+    if (
+      typeof navigator !== 'undefined' &&
+      navigator &&
+      navigator.onLine === false
+    ) {
+      console.warn(
+        'Skipping Firestore updateDoc for profile because navigator reports offline. Local UI updated only.'
+      );
+      alert(
+        'You appear to be offline. Your changes look saved here, but they may not persist on the server.'
+      );
+      return;
+    }
+
     try {
       await updateDoc(doc(db, 'users', user.uid), updates);
-      setUserData((prev) => ({ ...prev, ...updates }));
-      console.log('Profile saved.');
+      console.log('Profile saved to Firestore.');
     } catch (err) {
       console.error('Error saving profile:', err);
-      alert('Could not save profile. Please try again.');
+      alert('Could not save profile to the server. Your local changes may not persist.');
     }
   };
 
@@ -406,7 +448,7 @@ export default function App() {
 
         {/* Header (hidden in chat + upgrade) */}
         {!selectedMatch && activeTab !== 'upgrade' && (
-          <header className="h-16 shrink-0 px-4 flex items-center justify-between bg-white z-30 relative shadow-sm border-b border-gray-100">
+          <header className="h-16 shrink-0 px-4 flex itemsplotlib-center justify-between bg-white z-30 relative shadow-sm border-gray-100 border-b">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl flex items-center justify-center text-white shadow-rose-200 shadow-md">
                 <Dumbbell size={20} className="fill-white/20 stroke-[2.5]" />
