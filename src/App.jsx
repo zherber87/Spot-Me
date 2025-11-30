@@ -39,8 +39,7 @@ import {
 
 // ------------------------------------------------------------------
 // INSTRUCTIONS FOR LOCAL USE:
-// 1. Put your Firebase config in LOCAL_FIREBASE_CONFIG below OR
-//    pass __firebase_config as a JSON string globally.
+// 1. Put your Firebase config in .env as VITE_FIREBASE_* variables.
 // 2. If you move components to their own files, uncomment the imports
 //    and delete the definitions at the bottom of this file.
 // ------------------------------------------------------------------
@@ -54,43 +53,26 @@ import {
 
 // -------------------- FIREBASE INIT --------------------
 
-// Fallback local config – REPLACE WITH YOUR REAL CONFIG
-const LOCAL_FIREBASE_CONFIG = {
-  // apiKey: "YOUR_API_KEY",
-  // authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  // projectId: "YOUR_PROJECT_ID",
-  // storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  // messagingSenderId: "YOUR_SENDER_ID",
-  // appId: "YOUR_APP_ID",
+// Vite-style env access
+const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
+
+const firebaseConfig = {
+  apiKey: env.VITE_FIREBASE_API_KEY,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.VITE_FIREBASE_APP_ID,
 };
-
-let firebaseConfig = null;
-
-// Prefer __firebase_config if provided by your environment (e.g. preview)
-if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-  try {
-    firebaseConfig = JSON.parse(__firebase_config);
-  } catch (err) {
-    console.error('Failed to parse __firebase_config. Falling back to LOCAL_FIREBASE_CONFIG:', err);
-    firebaseConfig = LOCAL_FIREBASE_CONFIG;
-  }
-} else {
-  firebaseConfig = LOCAL_FIREBASE_CONFIG;
-}
-
-// Guard: if still missing apiKey, log a clear error.
-// This prevents silent crashes where the app just looks blank.
-if (!firebaseConfig || !firebaseConfig.apiKey) {
-  console.error(
-    'Firebase config is missing. Please set __firebase_config or fill in LOCAL_FIREBASE_CONFIG with your real Firebase credentials.'
-  );
-}
 
 let appInstance = null;
 let auth = null;
 let db = null;
 
 try {
+  if (!firebaseConfig.apiKey) {
+    throw new Error('Missing Firebase API key. Check your .env (VITE_FIREBASE_API_KEY).');
+  }
   appInstance = initializeApp(firebaseConfig);
   auth = getAuth(appInstance);
   db = getFirestore(appInstance);
@@ -125,7 +107,7 @@ export default function App() {
   useEffect(() => {
     if (!appInstance || !auth || !db) {
       setFirebaseError(
-        'There was a problem connecting to Firebase. Check your Firebase configuration in the code.'
+        'There was a problem connecting to Firebase. Check your Firebase configuration in the code / .env.'
       );
       setLoading(false);
     }
