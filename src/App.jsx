@@ -78,7 +78,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
 
-  const [loading, setLoading] = useState(true); // auth + own profile
+  const [loading, setLoading] = useState(true); // auth + basic profile
   const [authLoading, setAuthLoading] = useState(false);
   const [firebaseError, setFirebaseError] = useState(null);
 
@@ -112,11 +112,11 @@ export default function App() {
     }
   }, []);
 
-  // 1. Auth + load YOUR profile (fast, doesn’t wait on all other users)
+  // 1. Auth + load YOUR profile (fast, optimistic, doesn't block UI)
   useEffect(() => {
     if (!auth || !db) return;
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
 
       if (!currentUser) {
@@ -124,59 +124,65 @@ export default function App() {
         setProfiles([]);
         setLikes([]);
         setMatches([]);
-        setLoading(false);
+        setLoading(false); // done checking auth
         return;
       }
 
-      try {
-        const docRef = doc(db, 'users', currentUser.uid);
-        const docSnap = await getDoc(docRef);
+      // ✅ Immediately give ProfileScreen something to render
+      setUserData((prev) => {
+        if (prev) return prev;
+        return {
+          uid: currentUser.uid,
+          email: currentUser.email || '',
+          name: currentUser.displayName || 'User',
+          age: 18,
+          intent: 'Gym Partner',
+          bio: '',
+          emoji: '👤',
+          gym: '',
+          isPremium: false,
+          superSwipes: SUPER_SWIPE_DEFAULT,
+          swipesLeft: DAILY_SWIPE_LIMIT,
+        };
+      });
 
-        if (docSnap.exists()) {
-          setUserData(docSnap.data());
-        } else {
-          // Create basic profile if none exists
-          const fallback = {
-            uid: currentUser.uid,
-            email: currentUser.email || '',
-            name: currentUser.displayName || 'User',
-            age: 18,
-            intent: 'Gym Partner',
-            bio: '',
-            emoji: '👤',
-            gym: '',
-            isPremium: false,
-            superSwipes: SUPER_SWIPE_DEFAULT,
-            swipesLeft: DAILY_SWIPE_LIMIT,
-            createdAt: serverTimestamp(),
-          };
+      // We have a user; UI can render now
+      setLoading(false);
 
-          await setDoc(docRef, fallback, { merge: true });
-          setUserData(fallback);
+      // Then asynchronously fetch the real Firestore profile and merge it in
+      const fetchProfile = async () => {
+        try {
+          const docRef = doc(db, 'users', currentUser.uid);
+          const docSnap = await getDoc(docRef);
+
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setUserData((prev) => ({ ...(prev || {}), ...data }));
+          } else {
+            const fallback = {
+              uid: currentUser.uid,
+              email: currentUser.email || '',
+              name: currentUser.displayName || 'User',
+              age: 18,
+              intent: 'Gym Partner',
+              bio: '',
+              emoji: '👤',
+              gym: '',
+              isPremium: false,
+              superSwipes: SUPER_SWIPE_DEFAULT,
+              swipesLeft: DAILY_SWIPE_LIMIT,
+              createdAt: serverTimestamp(),
+            };
+            await setDoc(docRef, fallback, { merge: true });
+            setUserData((prev) => ({ ...(prev || {}), ...fallback }));
+          }
+        } catch (e) {
+          console.error('Error fetching user profile:', e);
+          // If Firestore fails, we already have the optimistic userData
         }
-      } catch (e) {
-        console.error('Error fetching user profile:', e);
-        // Fallback so ProfileScreen can still show something
-        setUserData((prev) => {
-          if (prev) return prev;
-          return {
-            uid: currentUser.uid,
-            email: currentUser.email || '',
-            name: currentUser.displayName || 'User',
-            age: 18,
-            intent: 'Gym Partner',
-            bio: '',
-            emoji: '👤',
-            gym: '',
-            isPremium: false,
-            superSwipes: SUPER_SWIPE_DEFAULT,
-            swipesLeft: DAILY_SWIPE_LIMIT,
-          };
-        });
-      } finally {
-        // ✅ Don’t block the app waiting on discover profiles
-        setLoading(false);
-      }
+      };
+
+      fetchProfile();
     });
 
     return () => unsubscribe();
@@ -193,7 +199,11 @@ export default function App() {
 
     const fetchProfiles = async () => {
       // If truly offline, skip hitting Firestore and keep whatever we have
-      if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+      if (
+        typeof navigator !== 'undefined' &&
+        navigator &&
+        navigator.onLine === false
+      ) {
         console.warn('Skipping profile fetch because navigator reports offline.');
         return;
       }
@@ -230,9 +240,8 @@ export default function App() {
         // Placeholder: no real matches logic yet
         setMatches([]);
       } catch (e) {
-        // This is where your "client is offline" error was coming from
         console.warn('Could not fetch discover profiles (maybe offline):', e);
-        // Don’t nuke existing profiles; just leave the old ones in place
+        // Don't wipe existing profiles; just leave whatever was there
       } finally {
         setProfilesLoading(false);
       }
@@ -359,7 +368,7 @@ export default function App() {
   }
 
   if (loading) {
-    // Only for initial auth + own profile
+    // Only for initial auth + basic profile
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 text-rose-500">
         <Loader2 className="animate-spin" size={32} />
