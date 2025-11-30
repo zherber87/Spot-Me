@@ -7,7 +7,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  // signInWithCustomToken, // ← not using this for now
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -83,8 +82,7 @@ export default function App() {
   const [firebaseError, setFirebaseError] = useState(null);
 
   // Navigation
-  // 'discover' | 'matches' | 'likes' | 'profile' | 'upgrade'
-  const [activeTab, setActiveTab] = useState('discover');
+  const [activeTab, setActiveTab] = useState('discover'); // 'discover' | 'matches' | 'likes' | 'profile' | 'upgrade'
   const [selectedMatch, setSelectedMatch] = useState(null);
 
   // UI
@@ -156,10 +154,10 @@ export default function App() {
           console.log('Fetched Users:', filtered);
           setProfiles(filtered);
 
-          // For now: fake likes = some of those users so LikesScreen isn't empty
+          // Fake likes so LikesScreen isn't empty for now
           setLikes(filtered.slice(0, 6));
 
-          // For now: no real matches logic yet
+          // Placeholder: no real matches logic yet
           setMatches([]);
         } catch (e) {
           console.error('Error fetching data:', e);
@@ -245,7 +243,6 @@ export default function App() {
         superSwipes: increment(5),
       });
       setUserData((prev) => ({ ...prev, isPremium: true }));
-      // After upgrade, send them back to profile
       setActiveTab('profile');
     } catch (err) {
       console.error('Upgrade failed', err);
@@ -262,12 +259,7 @@ export default function App() {
 
     if (direction === 'right') {
       console.log(`Liked ${profile.name}`);
-      // TODO: if you want to store likes in Firestore:
-      // await addDoc(collection(db, 'likes'), {
-      //   fromUid: user.uid,
-      //   toUid: profile.uid,
-      //   createdAt: serverTimestamp(),
-      // });
+      // TODO: store likes in Firestore if you want
     }
   };
 
@@ -335,7 +327,7 @@ export default function App() {
           />
         )}
 
-        {/* Header (hidden in chat + upgrade for cleaner look) */}
+        {/* Header (hidden in chat + upgrade for cleaner look if you want) */}
         {!selectedMatch && activeTab !== 'upgrade' && (
           <header className="h-16 shrink-0 px-4 flex items-center justify-between bg-white z-30 relative shadow-sm border-b border-gray-100">
             <div className="flex items-center gap-2.5">
@@ -369,7 +361,7 @@ export default function App() {
                   className={activeTab === 'likes' ? 'fill-rose-500' : ''}
                 />
                 {userData?.isPremium === false && (
-                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full" />
+                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full"></span>
                 )}
               </button>
             </div>
@@ -417,7 +409,7 @@ export default function App() {
           ) : null}
         </main>
 
-        {/* Bottom Navigation (hide in chat + upgrade) */}
+        {/* Bottom Navigation (hide in chat + optional hide in upgrade) */}
         {!selectedMatch && activeTab !== 'upgrade' && (
           <nav className="h-[72px] shrink-0 border-t border-gray-100 bg-white flex items-center justify-around pb-2 px-2 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.02)]">
             <button
