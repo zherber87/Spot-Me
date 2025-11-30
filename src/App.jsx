@@ -126,7 +126,24 @@ export default function App() {
           if (docSnap.exists()) {
             setUserData(docSnap.data());
           } else {
-            setUserData({ uid: currentUser.uid, email: currentUser.email });
+            // Create a fallback profile and write it to Firestore
+            const fallback = {
+              uid: currentUser.uid,
+              email: currentUser.email || '',
+              name: currentUser.displayName || 'User',
+              age: 18,
+              intent: 'Gym Partner',
+              bio: '',
+              emoji: '👤',
+              gym: '',
+              isPremium: false,
+              superSwipes: SUPER_SWIPE_DEFAULT,
+              swipesLeft: DAILY_SWIPE_LIMIT,
+              createdAt: serverTimestamp(),
+            };
+
+            await setDoc(docRef, fallback, { merge: true });
+            setUserData(fallback);
           }
 
           // B) Fetch all users for Discover
@@ -161,6 +178,29 @@ export default function App() {
           setMatches([]);
         } catch (e) {
           console.error('Error fetching data:', e);
+
+          // 🔥 IMPORTANT: still set some userData so ProfileScreen can render
+          setUserData((prev) => {
+            if (prev) return prev;
+            return {
+              uid: currentUser.uid,
+              email: currentUser.email || '',
+              name: currentUser.displayName || 'User',
+              age: 18,
+              intent: 'Gym Partner',
+              bio: '',
+              emoji: '👤',
+              gym: '',
+              isPremium: false,
+              superSwipes: SUPER_SWIPE_DEFAULT,
+              swipesLeft: DAILY_SWIPE_LIMIT,
+            };
+          });
+
+          // Clear lists if user fetch failed
+          setProfiles([]);
+          setLikes([]);
+          setMatches([]);
         }
       } else {
         setUserData(null);
@@ -284,7 +324,8 @@ export default function App() {
           <h1 className="text-2xl font-bold mb-2">Firebase Error</h1>
           <p className="text-sm mb-4">{firebaseError}</p>
           <p className="text-xs text-gray-500">
-            Open the console for more details and verify your Firebase configuration.
+            Open the console for more details and verify your Firebase
+            configuration.
           </p>
         </div>
       </div>
