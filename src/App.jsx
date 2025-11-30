@@ -155,8 +155,9 @@ export default function App() {
             ...d.data(),
           }));
 
-          // Remove yourself
-          allUsers = allUsers.filter((u) => u.uid !== currentUser.uid);
+          // ⚠️ For now, DO NOT filter yourself out so you see at least one profile
+          // If you want to hide yourself later, re-enable this:
+          // allUsers = allUsers.filter((u) => u.uid !== currentUser.uid);
 
           // Simple client-side filters (age + intent)
           const filtered = allUsers.filter((u) => {
@@ -179,7 +180,7 @@ export default function App() {
         } catch (e) {
           console.error('Error fetching data:', e);
 
-          // 🔥 IMPORTANT: still set some userData so ProfileScreen can render
+          // Still set some userData so ProfileScreen can render
           setUserData((prev) => {
             if (prev) return prev;
             return {
@@ -197,7 +198,6 @@ export default function App() {
             };
           });
 
-          // Clear lists if user fetch failed
           setProfiles([]);
           setLikes([]);
           setMatches([]);
