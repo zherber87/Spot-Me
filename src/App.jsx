@@ -33,12 +33,12 @@ import {
 // --------- Screens / Components (make sure these exist) ----------
 import { AuthScreen } from './components/AuthScreen';
 import { ProfileScreen } from './components/ProfileScreen';
-import { PremiumModal } from './components/PremiumModal';
 import { DiscoverScreen } from './components/DiscoverScreen';
 import { MatchesScreen } from './components/MatchesScreen';
 import { ChatScreen } from './components/ChatScreen';
 import { FiltersModal } from './components/FiltersModal';
 import { LikesScreen } from './components/LikesScreen';
+import { UpgradeScreen } from './components/UpgradeScreen';
 
 // -------------------- FIREBASE INIT --------------------
 
@@ -83,11 +83,10 @@ export default function App() {
   const [firebaseError, setFirebaseError] = useState(null);
 
   // Navigation
-  const [activeTab, setActiveTab] = useState('discover');
+  const [activeTab, setActiveTab] = useState('discover'); // 'discover' | 'matches' | 'likes' | 'profile' | 'upgrade'
   const [selectedMatch, setSelectedMatch] = useState(null);
 
   // UI
-  const [showPremium, setShowPremium] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
 
   // Data
@@ -187,7 +186,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [filters]); // re-run fetch when filters change
+  }, [filters]);
 
   // 2. Auth Handler (login / signup)
   const handleAuth = async (email, password, profileData = null) => {
@@ -215,6 +214,7 @@ export default function App() {
           intent: profileData.intent || 'Gym Partner',
           bio: profileData.bio || '',
           emoji: profileData.emoji || '👤',
+          gym: profileData.gym || '',
           isPremium: false,
           superSwipes: SUPER_SWIPE_DEFAULT,
           swipesLeft: DAILY_SWIPE_LIMIT,
@@ -247,7 +247,7 @@ export default function App() {
     }
   };
 
-  // 4. Upgrade Handler
+  // 4. Upgrade Handler (called from UpgradeScreen)
   const handleUpgrade = async () => {
     if (!user || !db) return;
     try {
@@ -256,9 +256,11 @@ export default function App() {
         superSwipes: increment(5),
       });
       setUserData((prev) => ({ ...prev, isPremium: true }));
-      setShowPremium(false);
+      // After upgrade, send them back to profile
+      setActiveTab('profile');
     } catch (err) {
       console.error('Upgrade failed', err);
+      alert('Upgrade failed. Please try again.');
     }
   };
 
@@ -277,6 +279,18 @@ export default function App() {
       //   toUid: profile.uid,
       //   createdAt: serverTimestamp(),
       // });
+    }
+  };
+
+  // 6. Save Profile (from ProfileScreen)
+  const handleSaveProfile = async (updates) => {
+    if (!user || !db) return;
+    try {
+      await updateDoc(doc(db, 'users', user.uid), updates);
+      setUserData((prev) => ({ ...prev, ...updates }));
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      alert('Could not save profile. Please try again.');
     }
   };
 
@@ -323,14 +337,6 @@ export default function App() {
   return (
     <div className="flex justify-center min-h-screen bg-gray-200 font-sans text-gray-900">
       <div className="w-full max-w-md h-[100dvh] bg-white sm:h-[850px] sm:my-6 sm:rounded-3xl sm:border-8 sm:border-gray-800 overflow-hidden shadow-2xl flex flex-col relative">
-        {/* Premium Modal Overlay */}
-        {showPremium && (
-          <PremiumModal
-            onClose={() => setShowPremium(false)}
-            onUpgrade={handleUpgrade}
-          />
-        )}
-
         {/* Filters Modal */}
         {showFilter && (
           <FiltersModal
@@ -340,8 +346,8 @@ export default function App() {
           />
         )}
 
-        {/* Header */}
-        {!selectedMatch && (
+        {/* Header (hidden in chat + upgrade for cleaner look if you want) */}
+        {!selectedMatch && activeTab !== 'upgrade' && (
           <header className="h-16 shrink-0 px-4 flex items-center justify-between bg-white z-30 relative shadow-sm border-b border-gray-100">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 bg-gradient-to-br from-rose-500 to-rose-600 rounded-xl flex items-center justify-center text-white shadow-rose-200 shadow-md">
@@ -393,7 +399,7 @@ export default function App() {
             <DiscoverScreen
               profiles={profiles}
               onSwipe={handleSwipe}
-              onTriggerPremium={() => setShowPremium(true)}
+              onTriggerPremium={() => setActiveTab('upgrade')}
             />
           ) : activeTab === 'matches' ? (
             <MatchesScreen
@@ -404,19 +410,26 @@ export default function App() {
             <LikesScreen
               likes={likes}
               isPremium={userData?.isPremium}
-              onUnlock={() => setShowPremium(true)}
+              onUnlock={() => setActiveTab('upgrade')}
             />
           ) : activeTab === 'profile' ? (
             <ProfileScreen
               userData={userData}
               onLogout={handleLogout}
-              onUpgradeClick={() => setShowPremium(true)}
+              onUpgradeClick={() => setActiveTab('upgrade')}
+              onSaveProfile={handleSaveProfile}
+            />
+          ) : activeTab === 'upgrade' ? (
+            <UpgradeScreen
+              userData={userData}
+              onBack={() => setActiveTab('profile')}
+              onConfirmUpgrade={handleUpgrade}
             />
           ) : null}
         </main>
 
-        {/* Bottom Navigation */}
-        {!selectedMatch && (
+        {/* Bottom Navigation (hide in chat + optional hide in upgrade) */}
+        {!selectedMatch && activeTab !== 'upgrade' && (
           <nav className="h-[72px] shrink-0 border-t border-gray-100 bg-white flex items-center justify-around pb-2 px-2 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.02)]">
             <button
               onClick={() => setActiveTab('discover')}
