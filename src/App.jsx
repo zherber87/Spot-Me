@@ -7,7 +7,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  signInWithCustomToken,
+  // signInWithCustomToken, // ← not using this for now
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -30,7 +30,7 @@ import {
   Loader2,
 } from 'lucide-react';
 
-// --------- Screens / Components (make sure these exist) ----------
+// --------- Screens / Components ----------
 import { AuthScreen } from './components/AuthScreen';
 import { ProfileScreen } from './components/ProfileScreen';
 import { DiscoverScreen } from './components/DiscoverScreen';
@@ -83,7 +83,8 @@ export default function App() {
   const [firebaseError, setFirebaseError] = useState(null);
 
   // Navigation
-  const [activeTab, setActiveTab] = useState('discover'); // 'discover' | 'matches' | 'likes' | 'profile' | 'upgrade'
+  // 'discover' | 'matches' | 'likes' | 'profile' | 'upgrade'
+  const [activeTab, setActiveTab] = useState('discover');
   const [selectedMatch, setSelectedMatch] = useState(null);
 
   // UI
@@ -114,18 +115,6 @@ export default function App() {
   // 1. Initial Auth Check & Setup + fetch users
   useEffect(() => {
     if (!auth || !db) return;
-
-    // Preview custom token support (optional)
-    const initAuth = async () => {
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-        try {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } catch (e) {
-          console.warn('Custom token sign-in failed (preview only):', e);
-        }
-      }
-    };
-    initAuth();
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -346,7 +335,7 @@ export default function App() {
           />
         )}
 
-        {/* Header (hidden in chat + upgrade for cleaner look if you want) */}
+        {/* Header (hidden in chat + upgrade for cleaner look) */}
         {!selectedMatch && activeTab !== 'upgrade' && (
           <header className="h-16 shrink-0 px-4 flex items-center justify-between bg-white z-30 relative shadow-sm border-b border-gray-100">
             <div className="flex items-center gap-2.5">
@@ -380,7 +369,7 @@ export default function App() {
                   className={activeTab === 'likes' ? 'fill-rose-500' : ''}
                 />
                 {userData?.isPremium === false && (
-                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full"></span>
+                  <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-500 border-2 border-white rounded-full" />
                 )}
               </button>
             </div>
@@ -428,7 +417,7 @@ export default function App() {
           ) : null}
         </main>
 
-        {/* Bottom Navigation (hide in chat + optional hide in upgrade) */}
+        {/* Bottom Navigation (hide in chat + upgrade) */}
         {!selectedMatch && activeTab !== 'upgrade' && (
           <nav className="h-[72px] shrink-0 border-t border-gray-100 bg-white flex items-center justify-around pb-2 px-2 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.02)]">
             <button
