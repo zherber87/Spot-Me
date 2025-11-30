@@ -77,7 +77,8 @@ const SUPER_SWIPE_DEFAULT = 2;
 export default function App() {
   const [user, setUser] = useState(null);
   const [userData, setUserData] = useState(null);
-  const [loading, setLoading] = useState(true);
+
+  const [loading, setLoading] = useState(true); // auth + own profile
   const [authLoading, setAuthLoading] = useState(false);
   const [firebaseError, setFirebaseError] = useState(null);
 
@@ -92,6 +93,7 @@ export default function App() {
   const [profiles, setProfiles] = useState([]);
   const [matches, setMatches] = useState([]);
   const [likes, setLikes] = useState([]);
+  const [profilesLoading, setProfilesLoading] = useState(false);
 
   const [filters, setFilters] = useState({
     distance: 25,
@@ -110,112 +112,136 @@ export default function App() {
     }
   }, []);
 
-  // 1. Initial Auth Check & Setup + fetch users
+  // 1. Auth + load YOUR profile (fast, doesn’t wait on all other users)
   useEffect(() => {
     if (!auth || !db) return;
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
-      if (currentUser) {
-        try {
-          // A) Fetch your profile
-          const docRef = doc(db, 'users', currentUser.uid);
-          const docSnap = await getDoc(docRef);
-
-          if (docSnap.exists()) {
-            setUserData(docSnap.data());
-          } else {
-            // Create a fallback profile and write it to Firestore
-            const fallback = {
-              uid: currentUser.uid,
-              email: currentUser.email || '',
-              name: currentUser.displayName || 'User',
-              age: 18,
-              intent: 'Gym Partner',
-              bio: '',
-              emoji: '👤',
-              gym: '',
-              isPremium: false,
-              superSwipes: SUPER_SWIPE_DEFAULT,
-              swipesLeft: DAILY_SWIPE_LIMIT,
-              createdAt: serverTimestamp(),
-            };
-
-            await setDoc(docRef, fallback, { merge: true });
-            setUserData(fallback);
-          }
-
-          // B) Fetch all users for Discover
-          const q = query(collection(db, 'users'));
-          const querySnapshot = await getDocs(q);
-
-          let allUsers = querySnapshot.docs.map((d) => ({
-            id: d.id,
-            ...d.data(),
-          }));
-
-          // ⚠️ For now, DO NOT filter yourself out so you see at least one profile
-          // If you want to hide yourself later, re-enable this:
-          // allUsers = allUsers.filter((u) => u.uid !== currentUser.uid);
-
-          // Simple client-side filters (age + intent)
-          const filtered = allUsers.filter((u) => {
-            const age = Number(u.age) || 0;
-            const matchesAge =
-              age >= filters.ageMin && age <= filters.ageMax;
-            const matchesIntent =
-              filters.intent === 'Any' || u.intent === filters.intent;
-            return matchesAge && matchesIntent;
-          });
-
-          console.log('Fetched Users:', filtered);
-          setProfiles(filtered);
-
-          // Fake likes so LikesScreen isn't empty for now
-          setLikes(filtered.slice(0, 6));
-
-          // Placeholder: no real matches logic yet
-          setMatches([]);
-        } catch (e) {
-          console.error('Error fetching data:', e);
-
-          // Still set some userData so ProfileScreen can render
-          setUserData((prev) => {
-            if (prev) return prev;
-            return {
-              uid: currentUser.uid,
-              email: currentUser.email || '',
-              name: currentUser.displayName || 'User',
-              age: 18,
-              intent: 'Gym Partner',
-              bio: '',
-              emoji: '👤',
-              gym: '',
-              isPremium: false,
-              superSwipes: SUPER_SWIPE_DEFAULT,
-              swipesLeft: DAILY_SWIPE_LIMIT,
-            };
-          });
-
-          setProfiles([]);
-          setLikes([]);
-          setMatches([]);
-        }
-      } else {
+      if (!currentUser) {
         setUserData(null);
         setProfiles([]);
-        setMatches([]);
         setLikes([]);
+        setMatches([]);
+        setLoading(false);
+        return;
       }
 
-      setLoading(false);
+      try {
+        const docRef = doc(db, 'users', currentUser.uid);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setUserData(docSnap.data());
+        } else {
+          // Create basic profile if none exists
+          const fallback = {
+            uid: currentUser.uid,
+            email: currentUser.email || '',
+            name: currentUser.displayName || 'User',
+            age: 18,
+            intent: 'Gym Partner',
+            bio: '',
+            emoji: '👤',
+            gym: '',
+            isPremium: false,
+            superSwipes: SUPER_SWIPE_DEFAULT,
+            swipesLeft: DAILY_SWIPE_LIMIT,
+            createdAt: serverTimestamp(),
+          };
+
+          await setDoc(docRef, fallback, { merge: true });
+          setUserData(fallback);
+        }
+      } catch (e) {
+        console.error('Error fetching user profile:', e);
+        // Fallback so ProfileScreen can still show something
+        setUserData((prev) => {
+          if (prev) return prev;
+          return {
+            uid: currentUser.uid,
+            email: currentUser.email || '',
+            name: currentUser.displayName || 'User',
+            age: 18,
+            intent: 'Gym Partner',
+            bio: '',
+            emoji: '👤',
+            gym: '',
+            isPremium: false,
+            superSwipes: SUPER_SWIPE_DEFAULT,
+            swipesLeft: DAILY_SWIPE_LIMIT,
+          };
+        });
+      } finally {
+        // ✅ Don’t block the app waiting on discover profiles
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
-  }, [filters]);
+  }, []);
 
-  // 2. Auth Handler (login / signup)
+  // 2. Fetch OTHER USERS for Discover / Likes (separate effect)
+  useEffect(() => {
+    if (!db || !user) {
+      setProfiles([]);
+      setLikes([]);
+      setMatches([]);
+      return;
+    }
+
+    const fetchProfiles = async () => {
+      // If truly offline, skip hitting Firestore and keep whatever we have
+      if (typeof navigator !== 'undefined' && navigator && navigator.onLine === false) {
+        console.warn('Skipping profile fetch because navigator reports offline.');
+        return;
+      }
+
+      try {
+        setProfilesLoading(true);
+
+        const q = query(collection(db, 'users'));
+        const querySnapshot = await getDocs(q);
+
+        let allUsers = querySnapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }));
+
+        // Remove yourself
+        allUsers = allUsers.filter((u) => u.uid !== user.uid);
+
+        // Simple client-side filters (age + intent)
+        const filtered = allUsers.filter((u) => {
+          const age = Number(u.age) || 0;
+          const matchesAge = age >= filters.ageMin && age <= filters.ageMax;
+          const matchesIntent =
+            filters.intent === 'Any' || u.intent === filters.intent;
+          return matchesAge && matchesIntent;
+        });
+
+        console.log('Fetched Users:', filtered);
+        setProfiles(filtered);
+
+        // Fake likes so LikesScreen isn't empty for now
+        setLikes(filtered.slice(0, 6));
+
+        // Placeholder: no real matches logic yet
+        setMatches([]);
+      } catch (e) {
+        // This is where your "client is offline" error was coming from
+        console.warn('Could not fetch discover profiles (maybe offline):', e);
+        // Don’t nuke existing profiles; just leave the old ones in place
+      } finally {
+        setProfilesLoading(false);
+      }
+    };
+
+    fetchProfiles();
+  }, [db, user, filters]);
+
+  // 3. Auth Handler (login / signup)
   const handleAuth = async (email, password, profileData = null) => {
     if (!auth || !db) {
       alert('Firebase is not initialized. Check your config.');
@@ -262,7 +288,7 @@ export default function App() {
     }
   };
 
-  // 3. Logout
+  // 4. Logout
   const handleLogout = async () => {
     if (!auth) return;
     try {
@@ -274,7 +300,7 @@ export default function App() {
     }
   };
 
-  // 4. Upgrade Handler (called from UpgradeScreen)
+  // 5. Upgrade Handler (called from UpgradeScreen)
   const handleUpgrade = async () => {
     if (!user || !db) return;
     try {
@@ -290,11 +316,10 @@ export default function App() {
     }
   };
 
-  // 5. Swipe Handler (like / pass)
+  // 6. Swipe Handler (like / pass)
   const handleSwipe = async (direction, profile) => {
     if (!user || !db) return;
 
-    // Remove card from local state
     setProfiles((prev) => prev.filter((p) => p.id !== profile.id));
 
     if (direction === 'right') {
@@ -303,12 +328,13 @@ export default function App() {
     }
   };
 
-  // 6. Save Profile (from ProfileScreen)
+  // 7. Save Profile (from ProfileScreen)
   const handleSaveProfile = async (updates) => {
     if (!user || !db) return;
     try {
       await updateDoc(doc(db, 'users', user.uid), updates);
       setUserData((prev) => ({ ...prev, ...updates }));
+      console.log('Profile saved.');
     } catch (err) {
       console.error('Error saving profile:', err);
       alert('Could not save profile. Please try again.');
@@ -333,6 +359,7 @@ export default function App() {
   }
 
   if (loading) {
+    // Only for initial auth + own profile
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 text-rose-500">
         <Loader2 className="animate-spin" size={32} />
@@ -368,7 +395,7 @@ export default function App() {
           />
         )}
 
-        {/* Header (hidden in chat + upgrade for cleaner look if you want) */}
+        {/* Header (hidden in chat + upgrade) */}
         {!selectedMatch && activeTab !== 'upgrade' && (
           <header className="h-16 shrink-0 px-4 flex items-center justify-between bg-white z-30 relative shadow-sm border-b border-gray-100">
             <div className="flex items-center gap-2.5">
@@ -420,6 +447,7 @@ export default function App() {
           ) : activeTab === 'discover' ? (
             <DiscoverScreen
               profiles={profiles}
+              loading={profilesLoading}
               onSwipe={handleSwipe}
               onTriggerPremium={() => setActiveTab('upgrade')}
             />
@@ -450,7 +478,7 @@ export default function App() {
           ) : null}
         </main>
 
-        {/* Bottom Navigation (hide in chat + optional hide in upgrade) */}
+        {/* Bottom Navigation (hide in chat + upgrade) */}
         {!selectedMatch && activeTab !== 'upgrade' && (
           <nav className="h-[72px] shrink-0 border-t border-gray-100 bg-white flex items-center justify-around pb-2 px-2 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.02)]">
             <button
