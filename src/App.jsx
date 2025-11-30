@@ -36,12 +36,11 @@ import {
 } from 'lucide-react';
 
 // -------------------- FIREBASE INIT --------------------
-// Using the environment's provided config
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-// Note: __initial_auth_token is handled in the main App component's useEffect
+// Safe initialization to handle environments where __firebase_config is missing
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+const app = firebaseConfig ? initializeApp(firebaseConfig) : null;
+const auth = app ? getAuth(app) : null;
+const db = app ? getFirestore(app) : null;
 
 // -------------------- CONSTANTS & DATA --------------------
 const DAILY_SWIPE_LIMIT = 50;
@@ -717,6 +716,13 @@ export default function App() {
 
   // 1. Initial Auth Check & Setup
   useEffect(() => {
+    // Demo Mode Check: If auth isn't initialized, skip the listeners
+    if (!auth) {
+        console.warn("Firebase not configured or found. Entering Demo Mode.");
+        setLoading(false);
+        return;
+    }
+
     const initAuth = async () => {
       // Check for custom token from environment (if provided by tool context)
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
@@ -773,6 +779,30 @@ export default function App() {
   // 2. Auth Handler
   const handleAuth = async (email, password, profileData = null) => {
     setAuthLoading(true);
+    
+    // DEMO MODE HANDLER
+    if (!auth) {
+        setTimeout(() => {
+            const demoUid = 'demo-user-id';
+            const newUserData = {
+                uid: demoUid,
+                email,
+                ...(profileData || {}),
+                name: profileData?.name || 'Demo User',
+                emoji: '👤',
+                isPremium: false,
+                swipesLeft: DAILY_SWIPE_LIMIT,
+                createdAt: new Date().toISOString()
+            };
+            setUser({ uid: demoUid, email });
+            setUserData(newUserData);
+            setProfiles(DEMO_PROFILES);
+            setMatches([{ id: 'm1', name: 'Mike', emoji: '😎', lastMsg: 'Hey!' }]);
+            setAuthLoading(false);
+        }, 800);
+        return;
+    }
+
     try {
       if (profileData) {
         // Signup
@@ -795,8 +825,7 @@ export default function App() {
       }
     } catch (error) {
       console.error("Auth error:", error);
-      // Simple alert for errors in this demo
-      // alert(error.message); 
+      alert(error.message); 
     } finally {
       setAuthLoading(false);
     }
@@ -804,6 +833,14 @@ export default function App() {
 
   // 3. Logout
   const handleLogout = async () => {
+    // Demo Mode Logout
+    if (!auth) {
+        setUser(null);
+        setUserData(null);
+        setActiveTab('discover');
+        return;
+    }
+
     try {
       await signOut(auth);
       setActiveTab('discover');
@@ -815,6 +852,13 @@ export default function App() {
 
   // 4. Upgrade Handler
   const handleUpgrade = async () => {
+    // Demo Mode Upgrade
+    if (!auth && user) {
+        setUserData(prev => ({ ...prev, isPremium: true }));
+        setShowPremium(false);
+        return;
+    }
+
     if (!user) return;
     try {
         await updateDoc(doc(db, 'users', user.uid), {
