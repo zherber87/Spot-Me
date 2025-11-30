@@ -30,15 +30,15 @@ import {
   Loader2,
 } from 'lucide-react';
 
-// Screens / components (you already created these in separate files)
-import { AuthScreen } from './AuthScreen';
-import { ProfileScreen } from './ProfileScreen';
-import { PremiumModal } from './PremiumModal';
-import { DiscoverScreen } from './DiscoverScreen';
-import { MatchesScreen } from './MatchesScreen';
-import { ChatScreen } from './ChatScreen';
-import { FiltersModal } from './FiltersModal';
-import { LikesScreen } from './LikesScreen';
+// --------- Screens / Components (make sure these exist) ----------
+import { AuthScreen } from './components/AuthScreen';
+import { ProfileScreen } from './components/ProfileScreen';
+import { PremiumModal } from './components/PremiumModal';
+import { DiscoverScreen } from './components/DiscoverScreen';
+import { MatchesScreen } from './components/MatchesScreen';
+import { ChatScreen } from './components/ChatScreen';
+import { FiltersModal } from './components/FiltersModal';
+import { LikesScreen } from './components/LikesScreen';
 
 // -------------------- FIREBASE INIT --------------------
 
@@ -82,15 +82,15 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [firebaseError, setFirebaseError] = useState(null);
 
-  // Navigation State
+  // Navigation
   const [activeTab, setActiveTab] = useState('discover');
   const [selectedMatch, setSelectedMatch] = useState(null);
 
-  // UI States
+  // UI
   const [showPremium, setShowPremium] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
 
-  // Data States
+  // Data
   const [profiles, setProfiles] = useState([]);
   const [matches, setMatches] = useState([]);
   const [likes, setLikes] = useState([]);
@@ -102,7 +102,7 @@ export default function App() {
     ageMax: 50,
   });
 
-  // If Firebase failed to init, show a friendly error instead of a blank screen
+  // If Firebase failed to init, show a friendly error
   useEffect(() => {
     if (!appInstance || !auth || !db) {
       setFirebaseError(
@@ -112,11 +112,11 @@ export default function App() {
     }
   }, []);
 
-  // 1. Initial Auth Check & Setup
+  // 1. Initial Auth Check & Setup + fetch users
   useEffect(() => {
     if (!auth || !db) return;
 
-    // Check for environment token (Preview only)
+    // Preview custom token support (optional)
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         try {
@@ -133,7 +133,7 @@ export default function App() {
 
       if (currentUser) {
         try {
-          // A) Fetch YOUR profile
+          // A) Fetch your profile
           const docRef = doc(db, 'users', currentUser.uid);
           const docSnap = await getDoc(docRef);
 
@@ -143,7 +143,7 @@ export default function App() {
             setUserData({ uid: currentUser.uid, email: currentUser.email });
           }
 
-          // B) Fetch REAL USERS for Discover
+          // B) Fetch all users for Discover
           const q = query(collection(db, 'users'));
           const querySnapshot = await getDocs(q);
 
@@ -152,10 +152,10 @@ export default function App() {
             ...d.data(),
           }));
 
-          // Filter out yourself from the deck
+          // Remove yourself
           allUsers = allUsers.filter((u) => u.uid !== currentUser.uid);
 
-          // Simple client-side filters
+          // Simple client-side filters (age + intent)
           const filtered = allUsers.filter((u) => {
             const age = Number(u.age) || 0;
             const matchesAge =
@@ -168,10 +168,10 @@ export default function App() {
           console.log('Fetched Users:', filtered);
           setProfiles(filtered);
 
-          // stub: you can replace this with real "likes" logic later
+          // For now: fake likes = some of those users so LikesScreen isn't empty
           setLikes(filtered.slice(0, 6));
 
-          // stub: no real matches logic yet
+          // For now: no real matches logic yet
           setMatches([]);
         } catch (e) {
           console.error('Error fetching data:', e);
@@ -187,9 +187,9 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [filters]); // re-filter when filters change
+  }, [filters]); // re-run fetch when filters change
 
-  // 2. Auth Handler
+  // 2. Auth Handler (login / signup)
   const handleAuth = async (email, password, profileData = null) => {
     if (!auth || !db) {
       alert('Firebase is not initialized. Check your config.');
@@ -207,7 +207,6 @@ export default function App() {
         );
         const uid = userCredential.user.uid;
 
-        // Save full profile to Firestore
         const newUserData = {
           uid,
           email,
@@ -263,16 +262,21 @@ export default function App() {
     }
   };
 
-  // 5. Swipe Handler
-  const handleSwipe = (direction, profile) => {
-    if (!user) return;
+  // 5. Swipe Handler (like / pass)
+  const handleSwipe = async (direction, profile) => {
+    if (!user || !db) return;
 
     // Remove card from local state
     setProfiles((prev) => prev.filter((p) => p.id !== profile.id));
 
     if (direction === 'right') {
       console.log(`Liked ${profile.name}`);
-      // Add Firestore 'like' logic here if needed
+      // TODO: if you want to store likes in Firestore:
+      // await addDoc(collection(db, 'likes'), {
+      //   fromUid: user.uid,
+      //   toUid: profile.uid,
+      //   createdAt: serverTimestamp(),
+      // });
     }
   };
 
@@ -300,7 +304,7 @@ export default function App() {
     );
   }
 
-  // Not Logged In -> Show Auth
+  // Not Logged In -> Auth screen
   if (!user) {
     return (
       <div className="flex justify-center min-h-screen bg-gray-200 font-sans">
